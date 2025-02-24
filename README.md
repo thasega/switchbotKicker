@@ -44,6 +44,10 @@ However, I didn't want to set up large and complex equipment just for that.
 ### Finding the Web Interface
 - Once the LED turns off, the **Pico W's web service is running**.  
 - Use the **MAC address** from Step 1 to find the Pico W’s **IP address** :)
+  - Use ping and arp commands
+  - See router's DHCP table
+  - If you start with the debug console connected, you will see the IP address.  
+    The address will probably remain the same for some time.
 - Open the IP address in a **web browser**, and the **control interface** should appear. 
 
 ## Usage
