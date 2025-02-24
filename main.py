@@ -190,7 +190,7 @@ async def web_server():
         ((0,1,2,3,4),USER.DESC_TEXT_WEEKDAYS),
         ((0,1,2,3),USER.DESC_TEXT_MON2THU),
         ((0,),USER.DESC_TEXT_MONDAY),
-        ((1,),USER.DESC_TEXT_MONDAY),
+        ((1,),USER.DESC_TEXT_TUESDAY),
         ((2,),USER.DESC_TEXT_WEDNESDAY),
         ((3,),USER.DESC_TEXT_THURSDAY),
         ((4,),USER.DESC_TEXT_FRIDAY),
