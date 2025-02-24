@@ -9,6 +9,11 @@ A high-accuracy scheduling agent written in MicroPython for triggering SwitchBot
 Tested and confirmed to work on Raspberry Pi Pico W.  
 MicroPython firmware used is [RPI_PICO_W-20241129-v1.24.1.uf2](https://micropython.org/download/RPI_PICO_W/)
 
+## Motivation
+SwitchBot's standard **Automation** has low accuracy in executing scenes at the scheduled time,  
+and sometimes the execution fails entirely. Due to personal reasons, I need the scenes to be executed with a few seconds of accuracy.  
+However, I didn't want to set up large and complex equipment just for that.  
+
 ## Installation Steps
 1. **Buy a Raspberry Pi Pico W** :)
    - Make sure to note down its **MAC address** using any method.
