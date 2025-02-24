@@ -46,3 +46,6 @@ However, I didn't want to set up large and complex equipment just for that.
 - Use the **MAC address** from Step 1 to find the Pico W’s **IP address** :)
 - Open the IP address in a **web browser**, and the **control interface** should appear. 
 
+## Effect
+The scenes are now executed with an accuracy of about **1 second** from the scheduled time.  
+I’m very satisfied with the result! :)
