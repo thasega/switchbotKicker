@@ -16,7 +16,7 @@ from collections import OrderedDict
 from microdot import Microdot
 from machine import Pin
 
-import usersetting as USER
+import usersettings as USER
 
 
 LED = machine.Pin('LED', Pin.OUT)
