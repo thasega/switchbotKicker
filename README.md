@@ -28,7 +28,8 @@ However, I didn't want to set up large and complex equipment just for that.
    - Edit the `usersettings.py` file from this repository to fit your environment.  
    - This includes:  
      - **WiFi SSID and password**  
-     - **SwitchBot API token**  
+     - **SwitchBot API token**
+     - **Time difference from UTC**
    - The file also contains **text resources for the user interface**.  
      - Feel free to change them to your preferred language.  
      - Since I’m Japanese, I like it as it is :)  
