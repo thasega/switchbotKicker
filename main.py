@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.30
+#  SwitchBot Kicker v1.31
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -27,9 +27,10 @@ def ledoff():
     LED.low()
 
 
-def JSTtime():
+def OffsetUTCtime():
     utc_time = utime.localtime()
-    return utime.mktime(utc_time) + 9 * 3600
+    ret = utime.mktime(utc_time) + USER.UTC_OFFSET
+    return ret if ret>=0 else 0
 
 def DatetimeString(nowtime):
     lt = utime.localtime(nowtime)
@@ -39,7 +40,7 @@ def DatetimeString(nowtime):
 logqueue = deque(tuple('' for _ in range(17)),16)
 def log(s,d=True):
     global logqueue
-    logqueue.append(f'{DatetimeString(JSTtime())} | {s}')
+    logqueue.append(f'{DatetimeString(OffsetUTCtime())} | {s}')
     if d: print(s)
 
 def logActive():
@@ -98,7 +99,7 @@ def AdjustTime():
     if ntp_time != 0:
         SetRTC(utime.localtime(ntp_time))
         log('Adjust RTC with NTP')
-        return JSTtime()
+        return OffsetUTCtime()
     else:
         log('Adjust RTC failure.')
         return 0
@@ -183,7 +184,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.30'
+    HEADLINE = 'SwitchBot Kicker v1.31'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -234,7 +235,7 @@ async def web_server():
 .form-container {{ display: flex; flex-direction: column; gap: 1px; }}
 .form-row {{ display: flex; align-items: center; gap: 8px; }}
 </style></head><body><h1>{HEADLINE}</h1>
-<pre>Log updated: {DatetimeString(JSTtime())}</pre><p></p>
+<pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre><p></p>
 <pre>{LOGS}</pre><hr><div class="form-container">
 '''
         for i in range(len(DataBase)):
@@ -294,12 +295,12 @@ async def web_server():
             i = int(request.form.get('id',-1))
             scenename = DataBase[i][8]
             testscene = SCENEDIC[scenename]
-            testtime = JSTtime()+1
+            testtime = OffsetUTCtime()+1
             log(f'Kick test scheduled: {testscene}')
             return html_backhome, 200, html_headers
 
         if action == 'adjust':
-            adjusttime = JSTtime()+1
+            adjusttime = OffsetUTCtime()+1
             log('Time adjust scheduled.')
             return html_backhome, 200, html_headers
 
@@ -532,23 +533,23 @@ async def worker():
     global adjusttime
 
     log('Start Worker')
-    nowtime = JSTtime()
+    nowtime = OffsetUTCtime()
     adjusttime = nowtime+12*3600
     activetime = nowtime+1
 
     execNow = -1
     while True:
         #ledon()
-        rtime = JSTtime()
+        rtime = OffsetUTCtime()
         dtime = utime.localtime(rtime)
         gc.collect()
         if execNow != dtime[5]:
             execNow = dtime[5]
 
             # Active Sense
-            if rtime==activetime:
+            if rtime>=activetime:
                 logActive()
-                activetime = JSTtime()+10
+                activetime = OffsetUTCtime()+10
 
             # Kick Test
             if rtime==testtime:
@@ -560,9 +561,9 @@ async def worker():
             # Time Adjust
             if rtime>=adjusttime:
                 if AdjustTime()==0:
-                    adjusttime = JSTtime()+5*60
+                    adjusttime = OffsetUTCtime()+5*60
                 else:
-                    adjusttime = JSTtime()+12*3600
+                    adjusttime = OffsetUTCtime()+12*3600
 
         #ledoff()
         await uasyncio.sleep(0.2)
@@ -583,7 +584,7 @@ def AppInit():
     while AdjustTime()==0:
         log('Retry')
         utime.sleep(2)
-    print(f'NOW(JST): {DatetimeString(JSTtime())}')
+    print(f'NOW(Offseted): {DatetimeString(OffsetUTCtime())}')
 
     gc.collect()
     ledoff()
