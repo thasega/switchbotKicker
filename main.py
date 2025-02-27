@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.31
+#  SwitchBot Kicker v1.32
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -104,6 +104,15 @@ def AdjustTime():
         log('Adjust RTC failure.')
         return 0
 
+def DispBootReason():
+    reset_cause = machine.reset_cause()
+    if reset_cause == machine.PWRON_RESET:
+        log('Boot cause Power-ON reset.')
+    elif reset_cause == machine.WDT_RESET:
+        log('Reboot cause WDT reset.')
+    else:
+        log('Reboot cause unknown reason.')
+
 
 # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
 DataBase=[]
@@ -184,7 +193,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.31'
+    HEADLINE = 'SwitchBot Kicker v1.32'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -536,8 +545,10 @@ async def worker():
     nowtime = OffsetUTCtime()
     adjusttime = nowtime+12*3600
     activetime = nowtime+1
-
     execNow = -1
+
+    wdt = machine.WDT(timeout=8000)
+    wdt.feed()
     while True:
         #ledon()
         rtime = OffsetUTCtime()
@@ -566,6 +577,7 @@ async def worker():
                     adjusttime = OffsetUTCtime()+12*3600
 
         #ledoff()
+        wdt.feed()
         await uasyncio.sleep(0.2)
 
 
@@ -576,16 +588,17 @@ async def dummy():
 
 def AppInit():
     ledon()
+
     ResetRTC()
 
     DispMACAddress()
     ConnectNetwork()
-
     while AdjustTime()==0:
         log('Retry')
         utime.sleep(2)
-    print(f'NOW(Offseted): {DatetimeString(OffsetUTCtime())}')
 
+    print(f'NOW(Offseted): {DatetimeString(OffsetUTCtime())}')
+    DispBootReason()
     gc.collect()
     ledoff()
 
