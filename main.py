@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.32
+#  SwitchBot Kicker v1.33
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -34,8 +34,8 @@ def OffsetUTCtime():
 
 def DatetimeString(nowtime):
     lt = utime.localtime(nowtime)
-    weekday_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    return '{:04d}/{:02d}/{:02d} {:s} {:02d}:{:02d}:{:02d}'.format(lt[0], lt[1], lt[2], weekday_names[lt[6]], lt[3], lt[4], lt[5])
+    wdnames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    return f'{lt[0]:04d}/{lt[1]:02d}/{lt[2]:02d} {wdnames[lt[6]]:s} {lt[3]:02d}:{lt[4]:02d}:{lt[5]:02d}'
 
 logqueue = deque(tuple('' for _ in range(17)),16)
 def log(s,d=True):
@@ -54,9 +54,10 @@ def DispMACAddress():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     mac = ubinascii.hexlify(wlan.config('mac'), ':').decode()
-    log('MAC address: {}'.format(mac))
+    log(f'MAC address: {mac}')
 
 def ConnectNetwork():
+    network.hostname("swbotkicker")
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.connect(USER.NET_SSID, USER.NET_PASS)
@@ -98,7 +99,7 @@ def AdjustTime():
     ntp_time = TimeFromNTP()
     if ntp_time != 0:
         SetRTC(utime.localtime(ntp_time))
-        log('Adjust RTC with NTP')
+        log('Adjust RTC with NTP.')
         return OffsetUTCtime()
     else:
         log('Adjust RTC failure.')
@@ -193,7 +194,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.32'
+    HEADLINE = 'SwitchBot Kicker v1.33'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -282,7 +283,7 @@ async def web_server():
         forms += f'''
 </div><hr><form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="-1">
-<button type="submit" name="action" value="change"{DISABLE}>{USER.DESC_BUTTON_APPEND}</button>
+<button type="submit" name="action" value="change"{DISABLE}>{USER.DESC_BUTTON_ADDSCHEDULE}</button>
 <button type="submit" name="action" value="adjust">{USER.DESC_BUTTON_TIMEADJUST}</button>
 <button type="submit" name="action" value="regist">{USER.DESC_BUTTON_SCENEREGIST}</button>
 </form></body></html>
@@ -511,7 +512,7 @@ async def web_server():
         gc.collect()
         return html_backhome, 200, html_headers
 
-    log("Start Web server")
+    log("Start Web server.")
     await app.run(port=80)
 
 async def web():
@@ -541,7 +542,7 @@ async def worker():
     global testscene
     global adjusttime
 
-    log('Start Worker')
+    log('Start Worker.')
     nowtime = OffsetUTCtime()
     adjusttime = nowtime+12*3600
     activetime = nowtime+1
