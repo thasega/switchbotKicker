@@ -50,7 +50,7 @@ However, I didn't want to set up large and complex equipment just for that.
   - If you start with the debug console connected, you will see the IP address.  
     The address will probably remain the same for some time.
 - Open the IP address in a **web browser**, and the **control interface** should appear.  
-- (If you are using MicroPython firmware where Port 5353 is not occupied, you can access it at http://swbotkicker.local/)
+- (If you are using modified MicroPython firmware where Port 5353 is not occupied, you can access it at http://swbotkicker.local/)
 
 ## Usage
 You should be able to figure it out by looking at the **Web interface**. It’s designed to be intuitive and easy to use.
