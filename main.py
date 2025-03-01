@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.33
+#  SwitchBot Kicker v1.34
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -11,7 +11,7 @@ import utime
 import gc
 import aiohttp
 import ujson
-from collections import deque
+import select
 from collections import OrderedDict
 from microdot import Microdot
 from machine import Pin
@@ -37,18 +37,23 @@ def DatetimeString(nowtime):
     wdnames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     return f'{lt[0]:04d}/{lt[1]:02d}/{lt[2]:02d} {wdnames[lt[6]]:s} {lt[3]:02d}:{lt[4]:02d}:{lt[5]:02d}'
 
-logqueue = deque(tuple('' for _ in range(17)),16)
+logqueue = []
+def loginit():
+    for i in range(16):
+        logqueue.append('')
+
 def log(s,d=True):
     global logqueue
+    if len(logqueue)>=16:
+        logqueue.pop(0)
     logqueue.append(f'{DatetimeString(OffsetUTCtime())} | {s}')
     if d: print(s)
 
 def logActive():
-    global logqueue
     if '| Worker Active' in logqueue[-1]:
         logqueue.pop()
-    log('Worker Active',False)
-    
+    log('Worker Active', False)
+
 
 def DispMACAddress():
     wlan = network.WLAN(network.STA_IF)
@@ -108,7 +113,7 @@ def AdjustTime():
 def DispBootReason():
     reset_cause = machine.reset_cause()
     if reset_cause == machine.PWRON_RESET:
-        log('Boot cause Power-ON reset.')
+        log('Boot cause Power-ON.')
     elif reset_cause == machine.WDT_RESET:
         log('Reboot cause WDT reset.')
     else:
@@ -194,7 +199,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.33'
+    HEADLINE = 'SwitchBot Kicker v1.34'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -536,6 +541,15 @@ async def checkScheduleAndKick(dtime):
                         else:
                             log(f'Scene name "{scenename}" does not found.')
 
+wdt = None
+def WDTstart():
+    global wdt
+    wdt = machine.WDT(timeout=8000)
+    
+def WDTfeed():
+    global wdt
+    if wdt!=None:
+        wdt.feed()
 
 async def worker():
     global testtime
@@ -548,8 +562,8 @@ async def worker():
     activetime = nowtime+1
     execNow = -1
 
-    wdt = machine.WDT(timeout=8000)
-    wdt.feed()
+    WDTstart()
+    WDTfeed()
     while True:
         #ledon()
         rtime = OffsetUTCtime()
@@ -578,20 +592,74 @@ async def worker():
                     adjusttime = OffsetUTCtime()+12*3600
 
         #ledoff()
-        wdt.feed()
+        WDTfeed()
         await uasyncio.sleep(0.2)
 
 
-async def dummy():
+def inet_aton(ip_str):
+    return bytes(map(int, ip_str.split(".")))
+
+async def mDNS():
+    await mDNSresponder()
     while True:
         await uasyncio.sleep(24*3600)
+
+async def mDNSresponder():
+    MDNS_GROUP = "224.0.0.251"
+    MDNS_PORT = 5353
+
+    ip = network.WLAN(network.STA_IF).ifconfig()[0]
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind(('', MDNS_PORT))
+    except Exception:
+        log('Start mDNS responder failure... (optional)')
+        return
+    mreq = struct.pack("4sl", inet_aton(MDNS_GROUP), 0)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
+    log("Start mDNS responder. (optional)")
+    while True:
+        await uasyncio.sleep(0.1)
+
+        rlist, _, _ = select.select([sock], [], [], 0)
+        if not rlist: continue
+
+        data, addr = sock.recvfrom(1024)
+        #print(f"Received mDNS query from {addr}: {data.hex()}")
+
+        if b'swbotkicker' in data:
+            #print("Sending mDNS response...")
+            response = (
+                b'\x00\x00'  # Transaction ID
+                b'\x84\x00'  # Flags (QR=1, OPCODE=0, AA=1, TC=0, RD=0, RA=0, Z=0, AD=0, CD=0, RCODE=0)
+                b'\x00\x00'  # Questions = 1
+                b'\x00\x01'  # Answers = 1（A）
+                b'\x00\x00'  # Authority RRs = 0
+                b'\x00\x00'  # Additional RRs = 0
+
+                # A Record (IPV4)
+                b'\x0Bswbotkicker\x05local\x00'
+                b'\x00\x01'  # Type: A
+                b'\x00\x01'  # Class: IN
+                b'\x00\x00\x01\x2C'  # TTL = 5*60s
+                b'\x00\x04'  # Data length = 4
+                + inet_aton(ip)  # IPv4 Address
+            )
+
+            sock.sendto(response, (MDNS_GROUP, MDNS_PORT))
+            sock.sendto(response, (MDNS_GROUP, MDNS_PORT))
+            sock.sendto(response, (MDNS_GROUP, MDNS_PORT))
+            #print(f"mDNS response sent: {response.hex()}")
 
 
 def AppInit():
     ledon()
-
+    loginit()
     ResetRTC()
-
+    DispBootReason()
     DispMACAddress()
     ConnectNetwork()
     while AdjustTime()==0:
@@ -599,7 +667,6 @@ def AppInit():
         utime.sleep(2)
 
     print(f'NOW(Offseted): {DatetimeString(OffsetUTCtime())}')
-    DispBootReason()
     gc.collect()
     ledoff()
 
@@ -610,7 +677,7 @@ def AppStart():
     gc.collect()
     uasyncio.create_task(web())
     uasyncio.create_task(worker())
-    uasyncio.run(dummy())
+    uasyncio.run(mDNS())
 
 def AppMain():
     AppInit()
