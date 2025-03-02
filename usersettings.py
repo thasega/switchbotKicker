@@ -7,6 +7,8 @@ SB_API_TOKEN = '<<YOUR_SWITCHBOT_API_TOKEN>>'
 NTP_HOST = 'pool.ntp.org'
 UTC_OFFSET = 9*3600
 
+HOSTNAME = 'swbotkicker'
+
 # PLEASE CHANGE TO YOUR LANGUAGE
 DESC_TEXT_SCHEDULESETTING = '実行する時刻とシーンを設定してください'
 DESC_TEXT_REGISTSCENES    = '登録するシーンを選択してください'

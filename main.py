@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.34
+#  SwitchBot Kicker v1.35
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -59,10 +59,10 @@ def DispMACAddress():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     mac = ubinascii.hexlify(wlan.config('mac'), ':').decode()
-    log(f'MAC address: {mac}')
+    log(f'MAC address = {mac}')
 
 def ConnectNetwork():
-    network.hostname("swbotkicker")
+    network.hostname(USER.HOSTNAME)
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.connect(USER.NET_SSID, USER.NET_PASS)
@@ -97,7 +97,7 @@ def TimeFromNTP():
     finally:
         s.close()
 
-    val = struct.unpack("!I", msg[40:44])[0]
+    val = struct.unpack('!I', msg[40:44])[0]
     return val - NTP_DELTA
 
 def AdjustTime():
@@ -160,8 +160,8 @@ def SaveSceneDic():
 
 
 APIheaders = {
-    "Authorization": "Bearer " + USER.SB_API_TOKEN,
-    "Content-Type": "application/json"
+    'Authorization': 'Bearer ' + USER.SB_API_TOKEN,
+    'Content-Type': 'application/json'
 }
 async def RetrieveScenes():
     url = 'https://api.switch-bot.com/v1.0/scenes'
@@ -176,7 +176,7 @@ async def ExecuteScene(SCENE_ID):
         return
 
     log(f'Execute scene {SCENE_ID}')
-    url = f"https://api.switch-bot.com/v1.0/scenes/{SCENE_ID}/execute"
+    url = f'https://api.switch-bot.com/v1.0/scenes/{SCENE_ID}/execute'
     ledon()
     gc.collect()
     async with aiohttp.ClientSession() as session:
@@ -199,7 +199,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.34'
+    HEADLINE = 'SwitchBot Kicker v1.35'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -517,7 +517,7 @@ async def web_server():
         gc.collect()
         return html_backhome, 200, html_headers
 
-    log("Start Web server.")
+    log('Start Web server.')
     await app.run(port=80)
 
 async def web():
@@ -580,7 +580,7 @@ async def worker():
             # Kick Test
             if rtime==testtime:
                 await ExecuteScene(testscene)
-                log("Kick test executed.")
+                log('Kick test executed.')
 
             await checkScheduleAndKick(dtime)
                                     
@@ -596,63 +596,51 @@ async def worker():
         await uasyncio.sleep(0.2)
 
 
-def inet_aton(ip_str):
-    return bytes(map(int, ip_str.split(".")))
-
 async def mDNS():
     await mDNSresponder()
     while True:
         await uasyncio.sleep(24*3600)
 
-async def mDNSresponder():
-    MDNS_GROUP = "224.0.0.251"
-    MDNS_PORT = 5353
+def inet_aton(ip_str):
+    return bytes(map(int, ip_str.split('.')))
 
-    ip = network.WLAN(network.STA_IF).ifconfig()[0]
+async def mDNSresponder():
+    MDNS_GROUP = '224.0.0.251'
+    MDNS_PORT = 5353
+    MDNS_HOSTNAME = USER.HOSTNAME
+    MDNS_TTL = 60
+
+    namelen = len(MDNS_HOSTNAME)
+    namebytes = bytes(MDNS_HOSTNAME,'utf-8')
+
+    response_base = struct.pack(f'!HHHHHHB{namelen}s7sHHLH',0,0x8400,0,1,0,0,namelen,namebytes,'\x05local\x00',1,1,MDNS_TTL,4)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         sock.bind(('', MDNS_PORT))
     except Exception:
-        log('Start mDNS responder failure... (optional)')
+        # log('Start mDNS responder failure... (optional)')
         return
-    mreq = struct.pack("4sl", inet_aton(MDNS_GROUP), 0)
+    mreq = struct.pack('4sl', inet_aton(MDNS_GROUP), 0)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    log("Start mDNS responder. (optional)")
+    log(f'Start mDNS responder - {MDNS_HOSTNAME}.local')
     while True:
-        await uasyncio.sleep(0.1)
-
+        await uasyncio.sleep(0.01)
         rlist, _, _ = select.select([sock], [], [], 0)
         if not rlist: continue
 
         data, addr = sock.recvfrom(1024)
-        #print(f"Received mDNS query from {addr}: {data.hex()}")
+        #print(f'Received mDNS query from {addr}: {data.hex()}')
 
-        if b'swbotkicker' in data:
+        if namebytes in data:
+            ipadrs = network.WLAN(network.STA_IF).ifconfig()[0]
+            response_packet = response_base + inet_aton(ipadrs)
             #print("Sending mDNS response...")
-            response = (
-                b'\x00\x00'  # Transaction ID
-                b'\x84\x00'  # Flags (QR=1, OPCODE=0, AA=1, TC=0, RD=0, RA=0, Z=0, AD=0, CD=0, RCODE=0)
-                b'\x00\x00'  # Questions = 1
-                b'\x00\x01'  # Answers = 1（A）
-                b'\x00\x00'  # Authority RRs = 0
-                b'\x00\x00'  # Additional RRs = 0
-
-                # A Record (IPV4)
-                b'\x0Bswbotkicker\x05local\x00'
-                b'\x00\x01'  # Type: A
-                b'\x00\x01'  # Class: IN
-                b'\x00\x00\x01\x2C'  # TTL = 5*60s
-                b'\x00\x04'  # Data length = 4
-                + inet_aton(ip)  # IPv4 Address
-            )
-
-            sock.sendto(response, (MDNS_GROUP, MDNS_PORT))
-            sock.sendto(response, (MDNS_GROUP, MDNS_PORT))
-            sock.sendto(response, (MDNS_GROUP, MDNS_PORT))
-            #print(f"mDNS response sent: {response.hex()}")
+            sock.sendto(response_packet, (MDNS_GROUP, MDNS_PORT))
+            sock.sendto(response_packet, (MDNS_GROUP, MDNS_PORT))
+            #print(f'mDNS response sent: {response_packet.hex()}')
 
 
 def AppInit():
