@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.35
+#  SwitchBot Kicker v1.37
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -199,12 +199,14 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.35'
+    HEADLINE = 'SwitchBot Kicker v1.37'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
         ((0,1,2,3,4),USER.DESC_TEXT_WEEKDAYS),
         ((0,1,2,3),USER.DESC_TEXT_MON2THU),
+        ((0,2,4),USER.DESC_TEXT_MONWEFRI),
+        ((1,3,5),USER.DESC_TEXT_TUETHSAT),
         ((0,),USER.DESC_TEXT_MONDAY),
         ((1,),USER.DESC_TEXT_TUESDAY),
         ((2,),USER.DESC_TEXT_WEDNESDAY),
@@ -228,6 +230,13 @@ async def web_server():
 <meta charset="UTF-8"><title>{TITLE}</title>
 <style>body {{color: #ffffff; background-color: #000000;}}</style>
 <meta http-equiv="refresh" content="0;url=/regist" />
+</head><body></body></html>
+'''
+    html_transdelete = f'''
+<!DOCTYPE html><html><head>
+<meta charset="UTF-8"><title>{TITLE}</title>
+<style>body {{color: #ffffff; background-color: #000000;}}</style>
+<meta http-equiv="refresh" content="0;url=/delete" />
 </head><body></body></html>
 '''
     html_headers = {'Content-Type': 'text/html'}
@@ -284,13 +293,14 @@ async def web_server():
         if len(DataBase)==0:
             forms += f'<label>{USER.DESC_TEXT_NOSCHEDULE}</label>'
 
-        DISABLE = ' disabled' if '(_initial_)' in SCENEDIC.keys() else ''
+        DISABLE = ' disabled' if '(_initial_)' in SCENEDIC.keys() or len(SCENEDIC) == 0 else ''
         forms += f'''
 </div><hr><form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="-1">
 <button type="submit" name="action" value="change"{DISABLE}>{USER.DESC_BUTTON_ADDSCHEDULE}</button>
 <button type="submit" name="action" value="adjust">{USER.DESC_BUTTON_TIMEADJUST}</button>
 <button type="submit" name="action" value="regist">{USER.DESC_BUTTON_SCENEREGIST}</button>
+<button type="submit" name="action" value="delete"{DISABLE}>{USER.DESC_BUTTON_SCENEDELETE}</button>
 </form></body></html>
 '''
         gc.collect()
@@ -321,6 +331,9 @@ async def web_server():
 
         if action == 'regist':
             return html_transregist, 200, html_headers
+
+        if action == 'delete':
+            return html_transdelete, 200, html_headers
 
         gc.collect()
         forms = f'''
@@ -485,8 +498,8 @@ async def web_server():
 </div>
 '''
                 idx += 1
-                gc.collect()
-            
+                gc.collect
+
         forms += f'''
 <hr><div>
 <button type="submit">{USER.DESC_BUTTON_REGIST}</button>
@@ -515,6 +528,50 @@ async def web_server():
         del parsed_scenes
         parsed_scenes = None
         gc.collect()
+        return html_backhome, 200, html_headers
+
+    # Delete registered Switchbot scenes
+    @app.route('/delete')
+    async def _delete(request):
+        forms = f'''
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>{TITLE}</title>
+<style> body {{color: #ffffff; background-color: #000000;}}
+.form-container {{ display: flex; flex-direction: column; gap: 1px; }}
+.form-row {{ display: flex; align-items: center; gap: 10px; }}
+</style></head><body>
+<h1>{HEADLINE}</h1>
+<p>{USER.DESC_TEXT_SELECTDELSCENES}</p>
+<form action="/delapply" method="post">
+'''
+        for caption, sceneId in SCENEDIC.items():
+            if caption != '(_initial_)':
+                forms += f'''
+<div>
+<input type="checkbox" name="delete" value="{caption}">
+<span>{caption}</span>
+</div>
+'''
+            
+        forms += f'''
+<hr><div>
+<button type="submit">{USER.DESC_BUTTON_DELETE}</button>
+<button type="submit" name="action" value="cancel">{USER.DESC_BUTTON_DELETECANCEL}</button>
+</div></form></body></html>
+'''
+        gc.collect()
+        return forms, 200, html_headers
+
+    # Delete selected Switchbot scenes
+    @app.route('/delapply', methods=['POST'])
+    async def _delapply(request):
+        if request.form.get('action')!='cancel':
+            deletes = request.form.getlist('delete')
+            for caption in deletes:
+                if caption in SCENEDIC:
+                    del SCENEDIC[caption]
+                    print(f'SCENEDIC delete: "{caption}"')
+            SaveSceneDic()
         return html_backhome, 200, html_headers
 
     log('Start Web server.')
