@@ -268,6 +268,8 @@ async def web_server():
             LOGS += f' {s}\n'
 
         gc.collect()
+        sunrise_str = sunparam.convert_dayminute_to_timestring(sun_times['sunrise'])
+        sunset_str = sunparam.convert_dayminute_to_timestring(sun_times['sunset'])
         forms = f'''
 <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <meta http-equiv="refresh" content="60">
@@ -275,7 +277,8 @@ async def web_server():
 .form-container {{ display: flex; flex-direction: column; gap: 1px; }}
 .form-row {{ display: flex; align-items: center; gap: 8px; }}
 </style></head><body><h1>{HEADLINE}</h1>
-<pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre><p></p>
+<pre>Today's Sunrise/Sunset: {sunrise_str} / {sunset_str}</pre>
+<pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre>
 <pre>{LOGS}</pre><hr><div class="form-container">
 '''
         for i in range(len(DataBase)):
@@ -623,7 +626,7 @@ async def checkScheduleAndKick(dtime):
             if is_sunrise or is_sunset:
                 target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
                 target_sec = int(target_min * 60)
-                print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
+                #print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
                 if abs(now_sec - target_sec) < 1:
                     scenename = S[8]
                     await kickScene(scenename)
