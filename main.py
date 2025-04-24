@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.37
+#  SwitchBot Kicker v1.38
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -215,7 +215,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.37'
+    HEADLINE = 'SwitchBot Kicker v1.38'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -293,7 +293,6 @@ async def web_server():
             SECO=n[4]
             ACTV=' checked' if n[9] else '' 
 
-            # 時刻表示の特別処理
             if HOUR == -2:
                 TIME_STR = f'={USER.DESC_TEXT_SUNRISE}='
             elif HOUR == -3:
