@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.37
+#  SwitchBot Kicker v1.38
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -17,7 +17,21 @@ from microdot import Microdot
 from machine import Pin
 
 import usersettings as USER
+import sunparam
 
+sun_times = {"date": None, "sunrise": None, "sunset": None}
+
+def get_sun_times():
+    lt = utime.localtime()
+    year, month, mday = lt[0], lt[1], lt[2]
+    day_of_year = lt[7]
+    leap = sunparam.is_leapyear(year)
+    latitude = USER.LATITUDE
+    longitude = USER.LONGITUDE
+    tz_offset_hour = USER.UTC_OFFSET // 3600
+    calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+    today_str = f"{year:04d}-{month:02d}-{mday:02d}"
+    return {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
 
 LED = machine.Pin('LED', Pin.OUT)
 def ledon():
@@ -62,9 +76,11 @@ def DispMACAddress():
     log(f'MAC address = {mac}')
 
 def ConnectNetwork():
-    network.hostname(USER.HOSTNAME)
     wlan = network.WLAN(network.STA_IF)
+    wlan.active(False)
+    utime.sleep(1)
     wlan.active(True)
+    network.hostname(USER.HOSTNAME)
     wlan.connect(USER.NET_SSID, USER.NET_PASS)
 
     log('Connecting...')
@@ -199,7 +215,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.37'
+    HEADLINE = 'SwitchBot Kicker v1.38'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -252,6 +268,8 @@ async def web_server():
             LOGS += f' {s}\n'
 
         gc.collect()
+        sunrise_str = sunparam.convert_dayminute_to_timestring(sun_times['sunrise'])
+        sunset_str = sunparam.convert_dayminute_to_timestring(sun_times['sunset'])
         forms = f'''
 <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <meta http-equiv="refresh" content="60">
@@ -259,7 +277,8 @@ async def web_server():
 .form-container {{ display: flex; flex-direction: column; gap: 1px; }}
 .form-row {{ display: flex; align-items: center; gap: 8px; }}
 </style></head><body><h1>{HEADLINE}</h1>
-<pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre><p></p>
+<pre>Today's Sunrise/Sunset: {sunrise_str} / {sunset_str}</pre>
+<pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre>
 <pre>{LOGS}</pre><hr><div class="form-container">
 '''
         for i in range(len(DataBase)):
@@ -274,8 +293,14 @@ async def web_server():
             SECO=n[4]
             ACTV=' checked' if n[9] else '' 
 
-            HD = f'{HOUR:02d}' if HOUR>=0 else '**'
-            MD = f'{MINU:02d}' if MINU>=0 else '**'
+            if HOUR == -2:
+                TIME_STR = f'={USER.DESC_TEXT_SUNRISE}='
+            elif HOUR == -3:
+                TIME_STR = f'={USER.DESC_TEXT_SUNSET}='
+            else:
+                HD = f'{HOUR:02d}' if HOUR>=0 else '**'
+                MD = f'{MINU:02d}' if MINU>=0 else '**'
+                TIME_STR = f'{HD}:{MD}:{SECO:02d}'
             WKDN=''
             for D in WDPAT:
                 if D[0]==WKDY:
@@ -287,7 +312,7 @@ async def web_server():
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
 <button type="submit" name="action" value="test">{USER.DESC_BUTTON_EXECTEST}</button>
 <input type="checkbox"{ACTV} disabled>
-{WKDN} {HD}:{MD}:{SECO:02d}　{NAME}
+{WKDN} {TIME_STR}　{NAME}
 </form>
 '''
         if len(DataBase)==0:
@@ -379,6 +404,10 @@ async def web_server():
             cap = f'{j}' if j>=0 else '**'
             sel = ' selected' if j==HOUR else ''
             temp += f'<option value="{j}"{sel}>{cap}</option>'
+        sel_sunrise = ' selected' if HOUR==-2 else ''
+        sel_sunset = ' selected' if HOUR==-3 else ''
+        temp += f'<option value="-2"{sel_sunrise}>{USER.DESC_TEXT_SUNRISE}</option>'
+        temp += f'<option value="-3"{sel_sunset}>{USER.DESC_TEXT_SUNSET}</option>'
         temp += '</select>'
         forms += temp
 
@@ -582,21 +611,38 @@ async def web():
 
 
 async def checkScheduleAndKick(dtime):
+    global sun_times
     for S in DataBase:
         # S = (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
         # Check schedule active and weekdays
         if S[9] and dtime[6] in S[1]:
-            # Hour?
-            if S[2]<0 or dtime[3]==S[2]:
-                # Minute?
-                if S[3]<0 or dtime[4]==S[3]:
-                    # Second?
-                    if dtime[5]==S[4]:
-                        scenename = S[8]
-                        if scenename in SCENEDIC:
-                            await ExecuteScene(SCENEDIC[scenename])
-                        else:
-                            log(f'Scene name "{scenename}" does not found.')
+            hour = S[2]
+            minute = S[3]
+            second = S[4]
+            is_sunrise = hour == -2
+            is_sunset = hour == -3
+            now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
+            if is_sunrise or is_sunset:
+                target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
+                target_sec = int(target_min * 60)
+                #print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
+                if abs(now_sec - target_sec) < 1:
+                    scenename = S[8]
+                    await kickScene(scenename)
+            else:
+                if hour < 0 or dtime[3] == hour:
+                    if minute < 0 or dtime[4] == minute:
+                        if dtime[5] == second:
+                            scenename = S[8]
+                            await kickScene(scenename)
+
+
+async def kickScene(scenename):
+    if scenename in SCENEDIC:
+        await ExecuteScene(SCENEDIC[scenename])
+    else:
+        log(f'Scene name "{scenename}" does not found.')
+
 
 wdt = None
 def WDTstart():
@@ -612,6 +658,7 @@ async def worker():
     global testtime
     global testscene
     global adjusttime
+    global sun_times
 
     log('Start Worker.')
     nowtime = OffsetUTCtime()
@@ -621,11 +668,16 @@ async def worker():
 
     WDTstart()
     WDTfeed()
+    last_day = -1
     while True:
         #ledon()
         rtime = OffsetUTCtime()
         dtime = utime.localtime(rtime)
         gc.collect()
+        if dtime[2] != last_day:
+            sun_times = get_sun_times()
+            last_day = dtime[2]
+
         if execNow != dtime[5]:
             execNow = dtime[5]
 
@@ -651,6 +703,7 @@ async def worker():
         #ledoff()
         WDTfeed()
         await uasyncio.sleep(0.2)
+
 
 
 async def mDNS():
