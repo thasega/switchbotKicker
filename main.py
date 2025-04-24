@@ -19,10 +19,19 @@ from machine import Pin
 import usersettings as USER
 import sunparam
 
+
+LED = machine.Pin('LED', Pin.OUT)
+def ledon():
+    LED.high()
+
+def ledoff():
+    LED.low()
+
+
 sun_times = {"date": None, "sunrise": None, "sunset": None}
 
 def get_sun_times():
-    lt = utime.localtime()
+    lt = utime.localtime(OffsetUTCtime())
     year, month, mday = lt[0], lt[1], lt[2]
     day_of_year = lt[7]
     leap = sunparam.is_leapyear(year)
@@ -32,13 +41,6 @@ def get_sun_times():
     calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
     today_str = f"{year:04d}-{month:02d}-{mday:02d}"
     return {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
-
-LED = machine.Pin('LED', Pin.OUT)
-def ledon():
-    LED.high()
-
-def ledoff():
-    LED.low()
 
 
 def OffsetUTCtime():
