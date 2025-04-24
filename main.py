@@ -289,6 +289,7 @@ async def web_server():
             n = DataBase[i]
             IDNO=i
             NAME,WKDY,HOUR,MINU,SECO,ACTV = n[0],n[1],n[2],n[3],n[4],n[9]
+            checked = ' checked' if ACTV else ''
 
             if HOUR == -2 or HOUR == -3:
                 tsec = getSuntimes(HOUR, MINU)
@@ -315,10 +316,11 @@ async def web_server():
 <input type="hidden" name="id" value="{IDNO}">
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
 <button type="submit" name="action" value="test">{USER.DESC_BUTTON_EXECTEST}</button>
-<input type="checkbox"{ACTV} disabled>
+<input type="checkbox"{checked} disabled>
 {WKDN} {TIME_STR}　{NAME}
 </form>
 '''
+
         if len(DataBase)==0:
             forms += f'<label>{USER.DESC_TEXT_NOSCHEDULE}</label>'
 
