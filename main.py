@@ -63,9 +63,11 @@ def DispMACAddress():
     log(f'MAC address = {mac}')
 
 def ConnectNetwork():
-    network.hostname(USER.HOSTNAME)
     wlan = network.WLAN(network.STA_IF)
+    wlan.active(False)
+    utime.sleep(1)
     wlan.active(True)
+    network.hostname(USER.HOSTNAME)
     wlan.connect(USER.NET_SSID, USER.NET_PASS)
 
     log('Connecting...')
