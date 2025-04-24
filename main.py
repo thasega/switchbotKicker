@@ -623,6 +623,7 @@ async def checkScheduleAndKick(dtime):
             if is_sunrise or is_sunset:
                 target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
                 target_sec = int(target_min * 60)
+                print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
                 if abs(now_sec - target_sec) < 1:
                     scenename = S[8]
                     await kickScene(scenename)
