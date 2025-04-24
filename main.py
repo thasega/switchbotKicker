@@ -19,6 +19,7 @@ from machine import Pin
 import usersettings as USER
 import sunparam
 
+sun_times = {"date": None, "sunrise": None, "sunset": None}
 
 LED = machine.Pin('LED', Pin.OUT)
 def ledon():
@@ -596,6 +597,7 @@ async def web():
 
 
 async def checkScheduleAndKick(dtime):
+    global sun_times
     for S in DataBase:
         # S = (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
         # Check schedule active and weekdays
@@ -608,13 +610,19 @@ async def checkScheduleAndKick(dtime):
             now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
             target_sec = None
             if is_sunrise or is_sunset:
-                year, month, mday = dtime[0], dtime[1], dtime[2]
-                day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
-                leap = sunparam.is_leapyear(year)
-                latitude = getattr(USER, 'LATITUDE', 35.6581)
-                longitude = getattr(USER, 'LONGITUDE', 139.7414)
-                tz_offset_hour = USER.UTC_OFFSET // 3600
-                param = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+                today_str = f"{dtime[0]:04d}-{dtime[1]:02d}-{dtime[2]:02d}"
+                if sun_times["date"] == today_str:
+                    param = sun_times
+                else:
+                    year, month, mday = dtime[0], dtime[1], dtime[2]
+                    day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
+                    leap = sunparam.is_leapyear(year)
+                    latitude = getattr(USER, 'LATITUDE', 35.6581)
+                    longitude = getattr(USER, 'LONGITUDE', 139.7414)
+                    tz_offset_hour = USER.UTC_OFFSET // 3600
+                    calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+                    param = {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
+                    sun_times.update(param)
                 if is_sunrise:
                     target_min = int(param['sunrise'])
                 else:
@@ -654,6 +662,7 @@ async def worker():
     global testtime
     global testscene
     global adjusttime
+    global sun_times
 
     log('Start Worker.')
     nowtime = OffsetUTCtime()
@@ -661,13 +670,39 @@ async def worker():
     activetime = nowtime+1
     execNow = -1
 
+    # 起動時に日の出・日の入計算
+    dtime = utime.localtime(nowtime)
+    year, month, mday = dtime[0], dtime[1], dtime[2]
+    day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
+    leap = sunparam.is_leapyear(year)
+    latitude = getattr(USER, 'LATITUDE', 35.6581)
+    longitude = getattr(USER, 'LONGITUDE', 139.7414)
+    tz_offset_hour = USER.UTC_OFFSET // 3600
+    calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+    today_str = f"{year:04d}-{month:02d}-{mday:02d}"
+    sun_times = {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
+
     WDTstart()
     WDTfeed()
+    last_day = mday
     while True:
         #ledon()
         rtime = OffsetUTCtime()
         dtime = utime.localtime(rtime)
         gc.collect()
+        # 毎日0時に再計算
+        if dtime[2] != last_day:
+            year, month, mday = dtime[0], dtime[1], dtime[2]
+            day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
+            leap = sunparam.is_leapyear(year)
+            latitude = getattr(USER, 'LATITUDE', 35.6581)
+            longitude = getattr(USER, 'LONGITUDE', 139.7414)
+            tz_offset_hour = USER.UTC_OFFSET // 3600
+            calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+            today_str = f"{year:04d}-{month:02d}-{mday:02d}"
+            sun_times = {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
+            last_day = mday
+
         if execNow != dtime[5]:
             execNow = dtime[5]
 
@@ -693,6 +728,7 @@ async def worker():
         #ledoff()
         WDTfeed()
         await uasyncio.sleep(0.2)
+
 
 
 async def mDNS():
