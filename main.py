@@ -293,14 +293,17 @@ async def web_server():
             SECO=n[4]
             ACTV=' checked' if n[9] else '' 
 
-            if HOUR == -2:
-                TIME_STR = f'={USER.DESC_TEXT_SUNRISE}='
-            elif HOUR == -3:
-                TIME_STR = f'={USER.DESC_TEXT_SUNSET}='
+            if HOUR == -2 or HOUR == -3:
+                tsec = getSuntimes(HOUR, MINU)
+                if tsec is not None:
+                    tstr = sunparam.convert_dayminute_to_timestring(tsec/60)
+                    TIME_STR = f'<span style="color:#ff4444">{tstr}</span>'
+                else:
+                    TIME_STR = '<span style="color:#ff4444">--:--:--</span>'
             else:
                 HD = f'{HOUR:02d}' if HOUR>=0 else '**'
                 MD = f'{MINU:02d}' if MINU>=0 else '**'
-                TIME_STR = f'{HD}:{MD}:{SECO:02d}'
+                TIME_STR = f'<span>{HD}:{MD}:{SECO:02d}</span>'
             WKDN=''
             for D in WDPAT:
                 if D[0]==WKDY:
@@ -618,17 +621,8 @@ async def checkScheduleAndKick(dtime):
         if S[9] and dtime[6] in S[1]:
             hour, minute, second = S[2], S[3], S[4]
             now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
-            is_sunrise = hour == -2
-            is_sunset = hour == -3
-            if is_sunrise or is_sunset:
-                target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
-                # For sunrise, delay by 'minute'. For sunset, advance by 'minute'.
-                if is_sunrise and minute > 0:
-                    target_min += minute
-                if is_sunset and minute > 0:
-                    target_min -= minute
-                target_sec = int(target_min * 60)
-                #print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
+            target_sec = getSuntimes(hour,minute)
+            if target_sec != None:
                 if abs(now_sec - target_sec) < 1:
                     scenename = S[8]
                     await kickScene(scenename)
@@ -646,6 +640,20 @@ async def kickScene(scenename):
     else:
         log(f'Scene name "{scenename}" does not found.')
 
+
+def getSuntimes(hour, minute):
+    is_sunrise = hour == -2
+    is_sunset  = hour == -3
+    if is_sunrise or is_sunset:
+        target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
+        # For sunrise, delay by 'minute'. For sunset, advance by 'minute'.
+        if is_sunrise and minute > 0:
+            target_min += minute
+        if is_sunset and minute > 0:
+            target_min -= minute
+        return int(target_min * 60)    
+    return None
+    
 
 wdt = None
 def WDTstart():
