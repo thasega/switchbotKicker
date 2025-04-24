@@ -286,24 +286,23 @@ async def web_server():
             # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
             n = DataBase[i]
             IDNO=i
-            NAME=n[0]
-            WKDY=n[1]
-            HOUR=n[2]
-            MINU=n[3]
-            SECO=n[4]
-            ACTV=' checked' if n[9] else '' 
+            NAME,WKDY,HOUR,MINU,SECO,ACTV = n[0],n[1],n[2],n[3],n[4],n[9]
 
             if HOUR == -2 or HOUR == -3:
                 tsec = getSuntimes(HOUR, MINU)
                 if tsec is not None:
                     tstr = sunparam.convert_dayminute_to_timestring(tsec/60)
-                    TIME_STR = f'<span style="color:#ff4444">{tstr}</span>'
+                    timestr_html = f'{tstr}'
                 else:
-                    TIME_STR = '<span style="color:#ff4444">--:--:--</span>'
+                    timestr_html = '--:--:--'
             else:
                 HD = f'{HOUR:02d}' if HOUR>=0 else '**'
                 MD = f'{MINU:02d}' if MINU>=0 else '**'
-                TIME_STR = f'<span>{HD}:{MD}:{SECO:02d}</span>'
+                timestr_html = f'{HD}:{MD}:{SECO:02d}'
+            if n[9]:
+                TIME_STR = f'<span style="color:#ff4444">{timestr_html}</span>' if HOUR == -2 or HOUR == -3 else f'<span>{timestr_html}</span>'
+            else:
+                TIME_STR = f'<span style="color:#4488ff">{timestr_html}</span>'
             WKDN=''
             for D in WDPAT:
                 if D[0]==WKDY:
@@ -380,12 +379,7 @@ async def web_server():
         itsnew = i==-1
         IDNO=i
         # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
-        NAME=n[0]
-        WKDY=n[1]
-        HOUR=n[2]
-        MINU=n[3]
-        SECO=n[4]
-        SNAM=n[8]
+        NAME,WKDY,HOUR,MINU,SECO,SNAM,ACTV = n[0],n[1],n[2],n[3],n[4],n[8],n[9]
         ACTV=' checked' if n[9]==True else ''
         gc.collect()
 
