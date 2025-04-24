@@ -17,6 +17,7 @@ from microdot import Microdot
 from machine import Pin
 
 import usersettings as USER
+import sunparam
 
 
 LED = machine.Pin('LED', Pin.OUT)
@@ -375,10 +376,16 @@ async def web_server():
         forms += temp
 
         temp = '<select name="hour">'
+        # 通常の時刻
         for j in range(-1,24):
             cap = f'{j}' if j>=0 else '**'
             sel = ' selected' if j==HOUR else ''
             temp += f'<option value="{j}"{sel}>{cap}</option>'
+        # 日の出・日の入り（特別値: -2, -3）
+        sel_sunrise = ' selected' if HOUR==-2 else ''
+        sel_sunset = ' selected' if HOUR==-3 else ''
+        temp += f'<option value="-2"{sel_sunrise}>日の出</option>'
+        temp += f'<option value="-3"{sel_sunset}>日の入り</option>'
         temp += '</select>'
         forms += temp
 
@@ -586,17 +593,45 @@ async def checkScheduleAndKick(dtime):
         # S = (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
         # Check schedule active and weekdays
         if S[9] and dtime[6] in S[1]:
-            # Hour?
-            if S[2]<0 or dtime[3]==S[2]:
-                # Minute?
-                if S[3]<0 or dtime[4]==S[3]:
-                    # Second?
-                    if dtime[5]==S[4]:
-                        scenename = S[8]
-                        if scenename in SCENEDIC:
-                            await ExecuteScene(SCENEDIC[scenename])
-                        else:
-                            log(f'Scene name "{scenename}" does not found.')
+            hour = S[2]
+            minute = S[3]
+            second = S[4]
+            is_sunrise = hour == -2
+            is_sunset = hour == -3
+            now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
+            target_sec = None
+            if is_sunrise or is_sunset:
+                year, month, mday = dtime[0], dtime[1], dtime[2]
+                day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
+                leap = sunparam.is_leapyear(year)
+                latitude = getattr(USER, 'LATITUDE', 35.6581)
+                longitude = getattr(USER, 'LONGITUDE', 139.7414)
+                tz_offset_hour = USER.UTC_OFFSET // 3600
+                param = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+                if is_sunrise:
+                    target_min = int(param['sunrise'])
+                else:
+                    target_min = int(param['sunset'])
+                target_sec = target_min * 60 + second
+                if minute >= 0:
+                    target_sec += (minute - 0) * 60
+            else:
+                if hour < 0 or dtime[3] == hour:
+                    if minute < 0 or dtime[4] == minute:
+                        if dtime[5] == second:
+                            scenename = S[8]
+                            if scenename in SCENEDIC:
+                                await ExecuteScene(SCENEDIC[scenename])
+                            else:
+                                log(f'Scene name "{scenename}" does not found.')
+                    continue
+            if target_sec is not None:
+                if abs(now_sec - target_sec) < 1:
+                    scenename = S[8]
+                    if scenename in SCENEDIC:
+                        await ExecuteScene(SCENEDIC[scenename])
+                    else:
+                        log(f'Scene name "{scenename}" does not found.')
 
 wdt = None
 def WDTstart():
