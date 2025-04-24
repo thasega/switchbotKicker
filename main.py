@@ -616,14 +616,17 @@ async def checkScheduleAndKick(dtime):
         # S = (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
         # Check schedule active and weekdays
         if S[9] and dtime[6] in S[1]:
-            hour = S[2]
-            minute = S[3]
-            second = S[4]
+            hour, minute, second = S[2], S[3], S[4]
+            now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
             is_sunrise = hour == -2
             is_sunset = hour == -3
-            now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
             if is_sunrise or is_sunset:
                 target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
+                # For sunrise, delay by 'minute'. For sunset, advance by 'minute'.
+                if is_sunrise and minute > 0:
+                    target_min += minute
+                if is_sunset and minute > 0:
+                    target_min -= minute
                 target_sec = int(target_min * 60)
                 #print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
                 if abs(now_sec - target_sec) < 1:
