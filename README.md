@@ -30,6 +30,7 @@ However, I didn't want to set up large and complex equipment just for that.
      - **WiFi SSID and password**  
      - **SwitchBot API token**
      - **Time difference from UTC**
+     - **Latitude and longitude**
    - The file also contains **text resources for the user interface**.  
      - Feel free to change them to your preferred language.  
      - Since I’m Japanese, I like it as it is :)  

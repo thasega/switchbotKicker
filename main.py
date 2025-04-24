@@ -376,16 +376,14 @@ async def web_server():
         forms += temp
 
         temp = '<select name="hour">'
-        # 通常の時刻
         for j in range(-1,24):
             cap = f'{j}' if j>=0 else '**'
             sel = ' selected' if j==HOUR else ''
             temp += f'<option value="{j}"{sel}>{cap}</option>'
-        # 日の出・日の入り（特別値: -2, -3）
         sel_sunrise = ' selected' if HOUR==-2 else ''
         sel_sunset = ' selected' if HOUR==-3 else ''
-        temp += f'<option value="-2"{sel_sunrise}>日の出</option>'
-        temp += f'<option value="-3"{sel_sunset}>日の入り</option>'
+        temp += f'<option value="-2"{sel_sunrise}>{USER.DESC_TEXT_SUNRISE}</option>'
+        temp += f'<option value="-3"{sel_sunset}>{USER.DESC_TEXT_SUNSET}</option>'
         temp += '</select>'
         forms += temp
 
