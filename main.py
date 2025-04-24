@@ -277,8 +277,15 @@ async def web_server():
             SECO=n[4]
             ACTV=' checked' if n[9] else '' 
 
-            HD = f'{HOUR:02d}' if HOUR>=0 else '**'
-            MD = f'{MINU:02d}' if MINU>=0 else '**'
+            # 時刻表示の特別処理
+            if HOUR == -2:
+                TIME_STR = f'={USER.DESC_TEXT_SUNRISE}='
+            elif HOUR == -3:
+                TIME_STR = f'={USER.DESC_TEXT_SUNSET}='
+            else:
+                HD = f'{HOUR:02d}' if HOUR>=0 else '**'
+                MD = f'{MINU:02d}' if MINU>=0 else '**'
+                TIME_STR = f'{HD}:{MD}:{SECO:02d}'
             WKDN=''
             for D in WDPAT:
                 if D[0]==WKDY:
@@ -290,7 +297,7 @@ async def web_server():
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
 <button type="submit" name="action" value="test">{USER.DESC_BUTTON_EXECTEST}</button>
 <input type="checkbox"{ACTV} disabled>
-{WKDN} {HD}:{MD}:{SECO:02d}　{NAME}
+{WKDN} {TIME_STR}　{NAME}
 </form>
 '''
         if len(DataBase)==0:
