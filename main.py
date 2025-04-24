@@ -21,6 +21,18 @@ import sunparam
 
 sun_times = {"date": None, "sunrise": None, "sunset": None}
 
+def get_sun_times():
+    lt = utime.localtime()
+    year, month, mday = lt[0], lt[1], lt[2]
+    day_of_year = lt[7]
+    leap = sunparam.is_leapyear(year)
+    latitude = USER.LATITUDE
+    longitude = USER.LONGITUDE
+    tz_offset_hour = USER.UTC_OFFSET // 3600
+    calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
+    today_str = f"{year:04d}-{month:02d}-{mday:02d}"
+    return {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
+
 LED = machine.Pin('LED', Pin.OUT)
 def ledon():
     LED.high()
@@ -608,45 +620,26 @@ async def checkScheduleAndKick(dtime):
             is_sunrise = hour == -2
             is_sunset = hour == -3
             now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
-            target_sec = None
             if is_sunrise or is_sunset:
-                today_str = f"{dtime[0]:04d}-{dtime[1]:02d}-{dtime[2]:02d}"
-                if sun_times["date"] == today_str:
-                    param = sun_times
-                else:
-                    year, month, mday = dtime[0], dtime[1], dtime[2]
-                    day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
-                    leap = sunparam.is_leapyear(year)
-                    latitude = getattr(USER, 'LATITUDE', 35.6581)
-                    longitude = getattr(USER, 'LONGITUDE', 139.7414)
-                    tz_offset_hour = USER.UTC_OFFSET // 3600
-                    calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
-                    param = {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
-                    sun_times.update(param)
-                if is_sunrise:
-                    target_min = int(param['sunrise'])
-                else:
-                    target_min = int(param['sunset'])
-                target_sec = target_min * 60 + second
-                if minute >= 0:
-                    target_sec += (minute - 0) * 60
+                target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
+                target_sec = int(target_min * 60)
+                if abs(now_sec - target_sec) < 1:
+                    scenename = S[8]
+                    await kickScene(scenename)
             else:
                 if hour < 0 or dtime[3] == hour:
                     if minute < 0 or dtime[4] == minute:
                         if dtime[5] == second:
                             scenename = S[8]
-                            if scenename in SCENEDIC:
-                                await ExecuteScene(SCENEDIC[scenename])
-                            else:
-                                log(f'Scene name "{scenename}" does not found.')
-                    continue
-            if target_sec is not None:
-                if abs(now_sec - target_sec) < 1:
-                    scenename = S[8]
-                    if scenename in SCENEDIC:
-                        await ExecuteScene(SCENEDIC[scenename])
-                    else:
-                        log(f'Scene name "{scenename}" does not found.')
+                            await kickScene(scenename)
+
+
+async def kickScene(scenename):
+    if scenename in SCENEDIC:
+        await ExecuteScene(SCENEDIC[scenename])
+    else:
+        log(f'Scene name "{scenename}" does not found.')
+
 
 wdt = None
 def WDTstart():
@@ -670,38 +663,17 @@ async def worker():
     activetime = nowtime+1
     execNow = -1
 
-    # 起動時に日の出・日の入計算
-    dtime = utime.localtime(nowtime)
-    year, month, mday = dtime[0], dtime[1], dtime[2]
-    day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
-    leap = sunparam.is_leapyear(year)
-    latitude = getattr(USER, 'LATITUDE', 35.6581)
-    longitude = getattr(USER, 'LONGITUDE', 139.7414)
-    tz_offset_hour = USER.UTC_OFFSET // 3600
-    calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
-    today_str = f"{year:04d}-{month:02d}-{mday:02d}"
-    sun_times = {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
-
     WDTstart()
     WDTfeed()
-    last_day = mday
+    last_day = -1
     while True:
         #ledon()
         rtime = OffsetUTCtime()
         dtime = utime.localtime(rtime)
         gc.collect()
-        # 毎日0時に再計算
         if dtime[2] != last_day:
-            year, month, mday = dtime[0], dtime[1], dtime[2]
-            day_of_year = utime.localtime(utime.mktime((year, month, mday, 0, 0, 0, 0, 0)))[7]
-            leap = sunparam.is_leapyear(year)
-            latitude = getattr(USER, 'LATITUDE', 35.6581)
-            longitude = getattr(USER, 'LONGITUDE', 139.7414)
-            tz_offset_hour = USER.UTC_OFFSET // 3600
-            calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
-            today_str = f"{year:04d}-{month:02d}-{mday:02d}"
-            sun_times = {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
-            last_day = mday
+            sun_times = get_sun_times()
+            last_day = dtime[2]
 
         if execNow != dtime[5]:
             execNow = dtime[5]
