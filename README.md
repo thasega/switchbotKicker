@@ -30,13 +30,13 @@ However, I didn't want to set up large and complex equipment just for that.
      - **WiFi SSID and password**  
      - **SwitchBot API token**
      - **Time difference from UTC**
-     - **Latitude and longitude**
+     - **Latitude and longitude** (for sunrise/sunset time calculation)
    - The file also contains **text resources for the user interface**.  
      - Feel free to change them to your preferred language.  
      - Since I’m Japanese, I like it as it is :)  
 
 5. **Copy files to the Pico W**  
-   - Transfer the modified `usersettings.py` and `main.py` from this repository to the Pico W.
+   - Transfer the modified `usersettings.py` and `main.py` `sunparam.py` from this repository to the Pico W.
 
 6. **Run the device**  
    - Disconnect the **Pico W** from your PC and power it separately.  
