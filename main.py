@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.38
+#  SwitchBot Kicker v1.39
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -19,10 +19,19 @@ from machine import Pin
 import usersettings as USER
 import sunparam
 
+
+LED = machine.Pin('LED', Pin.OUT)
+def ledon():
+    LED.high()
+
+def ledoff():
+    LED.low()
+
+
 sun_times = {"date": None, "sunrise": None, "sunset": None}
 
 def get_sun_times():
-    lt = utime.localtime()
+    lt = utime.localtime(OffsetUTCtime())
     year, month, mday = lt[0], lt[1], lt[2]
     day_of_year = lt[7]
     leap = sunparam.is_leapyear(year)
@@ -32,13 +41,6 @@ def get_sun_times():
     calc = sunparam.calculate(day_of_year, leap, latitude, longitude, tz_offset_hour)
     today_str = f"{year:04d}-{month:02d}-{mday:02d}"
     return {"date": today_str, "sunrise": calc['sunrise'], "sunset": calc['sunset']}
-
-LED = machine.Pin('LED', Pin.OUT)
-def ledon():
-    LED.high()
-
-def ledoff():
-    LED.low()
 
 
 def OffsetUTCtime():
@@ -77,18 +79,27 @@ def DispMACAddress():
 
 def ConnectNetwork():
     wlan = network.WLAN(network.STA_IF)
-    wlan.active(False)
-    utime.sleep(1)
-    wlan.active(True)
-    network.hostname(USER.HOSTNAME)
-    wlan.connect(USER.NET_SSID, USER.NET_PASS)
-
-    log('Connecting...')
-    while not wlan.isconnected():
+    retry_max = 10
+    for attempt in range(retry_max):
+        wlan.active(False)
         utime.sleep(1)
-        print('Connecting...')
-
-    log(f'WiFi Connected. IP address: {wlan.ifconfig()[0]}')
+        wlan.active(True)
+        try:
+            network.hostname(USER.HOSTNAME)
+        except Exception as e:
+            log(f'hostname setting failure: {e}')
+        wlan.connect(USER.NET_SSID, USER.NET_PASS)
+        log(f'Trying WiFi connection {attempt+1}/{retry_max}...')
+        for t in range(10):
+            if wlan.isconnected():
+                log(f'WiFi Connected. IP address: {wlan.ifconfig()[0]}')
+                return
+            utime.sleep(1)
+            print(f'Connecting... ({t+1}/10)')
+        log('WiFi connection failed, retry.')
+    log('WiFi connection failed, reset!')
+    utime.sleep(2)
+    machine.reset()
 
 
 def ResetRTC():
@@ -101,20 +112,27 @@ def TimeFromNTP():
     NTP_DELTA = 2208988800
     NTP_QUERY = bytearray(48)
     NTP_QUERY[0] = 0x1B
-    addr = socket.getaddrinfo(USER.NTP_HOST, 123)[0][-1]
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(1)
-    s.sendto(NTP_QUERY, addr)
-    try:
-        msg = s.recv(48)
-    except OSError:
-        log('No responce from NTP server.')
-        return 0
-    finally:
-        s.close()
-
-    val = struct.unpack('!I', msg[40:44])[0]
-    return val - NTP_DELTA
+    max_retry = 5
+    for attempt in range(1, max_retry+1):
+        try:
+            addr = socket.getaddrinfo(USER.NTP_HOST, 123)[0][-1]
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(2)
+            s.sendto(NTP_QUERY, addr)
+            msg = s.recv(48)
+            s.close()
+            val = struct.unpack('!I', msg[40:44])[0]
+            log(f'NTP fetch succeeded! (attempt {attempt})')
+            return val - NTP_DELTA
+        except OSError as e:
+            log(f'No response from NTP server... (attempt {attempt}/{max_retry})')
+            try:
+                s.close()
+            except:
+                pass
+            utime.sleep(1)
+    log('All NTP fetch retries failed...')
+    return 0
 
 def AdjustTime():
     ntp_time = TimeFromNTP()
@@ -191,7 +209,7 @@ async def ExecuteScene(SCENE_ID):
         log(f'SceneID is empty.')
         return
 
-    log(f'Execute scene {SCENE_ID}')
+    log(f'Scene {SCENE_ID} is executing.')
     url = f'https://api.switch-bot.com/v1.0/scenes/{SCENE_ID}/execute'
     ledon()
     gc.collect()
@@ -215,7 +233,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.38'
+    HEADLINE = 'SwitchBot Kicker v1.39'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -286,35 +304,49 @@ async def web_server():
             # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
             n = DataBase[i]
             IDNO=i
-            NAME=n[0]
-            WKDY=n[1]
-            HOUR=n[2]
-            MINU=n[3]
-            SECO=n[4]
-            ACTV=' checked' if n[9] else '' 
+            NAME,WKDY,HOUR,MINU,SECO,ACTV = n[0],n[1],n[2],n[3],n[4],n[9]
+            checked = ' checked' if ACTV else ''
 
-            if HOUR == -2:
-                TIME_STR = f'={USER.DESC_TEXT_SUNRISE}='
-            elif HOUR == -3:
-                TIME_STR = f'={USER.DESC_TEXT_SUNSET}='
+            if HOUR == -2 or HOUR == -3:
+                tsec = getSuntimes(HOUR, MINU)
+                if tsec is not None:
+                    tstr = sunparam.convert_dayminute_to_timestring(tsec/60)
+                    timestr_html = f'{tstr}'
+                else:
+                    timestr_html = '--:--:--'
             else:
                 HD = f'{HOUR:02d}' if HOUR>=0 else '**'
                 MD = f'{MINU:02d}' if MINU>=0 else '**'
-                TIME_STR = f'{HD}:{MD}:{SECO:02d}'
+                timestr_html = f'{HD}:{MD}:{SECO:02d}'
+
             WKDN=''
             for D in WDPAT:
                 if D[0]==WKDY:
                     WKDN=D[1]
                     break
+
+            if n[9]:
+                if HOUR == -2 or HOUR == -3:
+                    namecolor = '#ffffff'
+                    timecolor = '#ff4444'  
+                else:
+                    namecolor = '#ffffff'
+                    timecolor = '#ffffff'
+            else:
+                namecolor = '#666666'
+                timecolor = '#666666'
+
+            name_html = f'<span style="color:{namecolor}">{NAME}</span>'
+
             forms += f'''
 <form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="{IDNO}">
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
 <button type="submit" name="action" value="test">{USER.DESC_BUTTON_EXECTEST}</button>
-<input type="checkbox"{ACTV} disabled>
-{WKDN} {TIME_STR}　{NAME}
+<span style="color:{timecolor}">{WKDN} {timestr_html}</span> {name_html}
 </form>
 '''
+
         if len(DataBase)==0:
             forms += f'<label>{USER.DESC_TEXT_NOSCHEDULE}</label>'
 
@@ -377,12 +409,7 @@ async def web_server():
         itsnew = i==-1
         IDNO=i
         # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
-        NAME=n[0]
-        WKDY=n[1]
-        HOUR=n[2]
-        MINU=n[3]
-        SECO=n[4]
-        SNAM=n[8]
+        NAME,WKDY,HOUR,MINU,SECO,SNAM,ACTV = n[0],n[1],n[2],n[3],n[4],n[8],n[9]
         ACTV=' checked' if n[9]==True else ''
         gc.collect()
 
@@ -616,16 +643,10 @@ async def checkScheduleAndKick(dtime):
         # S = (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
         # Check schedule active and weekdays
         if S[9] and dtime[6] in S[1]:
-            hour = S[2]
-            minute = S[3]
-            second = S[4]
-            is_sunrise = hour == -2
-            is_sunset = hour == -3
+            hour, minute, second = S[2], S[3], S[4]
             now_sec = dtime[3] * 3600 + dtime[4] * 60 + dtime[5]
-            if is_sunrise or is_sunset:
-                target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
-                target_sec = int(target_min * 60)
-                #print(f'Check {target_sec} {now_sec} {sunparam.convert_dayminute_to_timestring(target_min)}')
+            target_sec = getSuntimes(hour,minute)
+            if target_sec != None:
                 if abs(now_sec - target_sec) < 1:
                     scenename = S[8]
                     await kickScene(scenename)
@@ -643,6 +664,20 @@ async def kickScene(scenename):
     else:
         log(f'Scene name "{scenename}" does not found.')
 
+
+def getSuntimes(hour, minute):
+    is_sunrise = hour == -2
+    is_sunset  = hour == -3
+    if is_sunrise or is_sunset:
+        target_min = sun_times['sunrise'] if is_sunrise else sun_times['sunset']
+        # For sunrise, delay by 'minute'. For sunset, advance by 'minute'.
+        if is_sunrise and minute > 0:
+            target_min += minute
+        if is_sunset and minute > 0:
+            target_min -= minute
+        return int(target_min * 60)    
+    return None
+    
 
 wdt = None
 def WDTstart():
@@ -753,6 +788,19 @@ async def mDNSresponder():
             #print(f'mDNS response sent: {response_packet.hex()}')
 
 
+def AdjustTimeFirst():
+    max_retry = 20
+    for attempt in range(1, max_retry+1):
+        if AdjustTime()!=0:
+            return
+        log(f'Retry NTP sync... ({attempt}/{max_retry})')
+        utime.sleep(2)
+    log('NTP sync failed after 20 retries. Machine will reset!')
+    utime.sleep(2)
+    machine.reset()
+    return
+
+
 def AppInit():
     ledon()
     loginit()
@@ -760,10 +808,7 @@ def AppInit():
     DispBootReason()
     DispMACAddress()
     ConnectNetwork()
-    while AdjustTime()==0:
-        log('Retry')
-        utime.sleep(2)
-
+    AdjustTimeFirst()
     print(f'NOW(Offseted): {DatetimeString(OffsetUTCtime())}')
     gc.collect()
     ledoff()
