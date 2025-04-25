@@ -302,10 +302,7 @@ async def web_server():
                 HD = f'{HOUR:02d}' if HOUR>=0 else '**'
                 MD = f'{MINU:02d}' if MINU>=0 else '**'
                 timestr_html = f'{HD}:{MD}:{SECO:02d}'
-            if n[9]:
-                TIME_STR = f'<span style="color:#ff4444">{timestr_html}</span>' if HOUR == -2 or HOUR == -3 else f'<span>{timestr_html}</span>'
-            else:
-                TIME_STR = f'<span style="color:#4488ff">{timestr_html}</span>'
+
             WKDN=''
             for D in WDPAT:
                 if D[0]==WKDY:
@@ -314,18 +311,23 @@ async def web_server():
 
             if n[9]:
                 if HOUR == -2 or HOUR == -3:
-                    timecolor = '#ff4444'  # アクティブ＆サンタイム
+                    namecolor = '#ffffff'
+                    timecolor = '#ff4444'  
                 else:
-                    timecolor = '#ffffff'  # アクティブ＆通常
+                    namecolor = '#ffffff'
+                    timecolor = '#ffffff'
             else:
-                timecolor = '#222288'      # 非アクティブ
+                namecolor = '#666666'
+                timecolor = '#666666'
+
+            name_html = f'<span style="color:{namecolor}">{NAME}</span>'
 
             forms += f'''
 <form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="{IDNO}">
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
 <button type="submit" name="action" value="test">{USER.DESC_BUTTON_EXECTEST}</button>
-<span style="color:{timecolor}">{WKDN} {timestr_html}</span>　{NAME}
+<span style="color:{timecolor}">{WKDN} {timestr_html}</span> {name_html}
 </form>
 '''
 
