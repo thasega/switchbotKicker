@@ -311,13 +311,16 @@ async def web_server():
                 if D[0]==WKDY:
                     WKDN=D[1]
                     break
+            # 色分けロジックを一行でまとめる！
             if n[9]:
-                # アクティブ: サンタイムのみ赤、それ以外は白
                 if HOUR == -2 or HOUR == -3:
-                    timecolor = '#ff4444'
+                    timecolor = '#ff4444'  # アクティブ＆サンタイム
                 else:
-                    timecolor = '#ffffff'
-                forms += f'''
+                    timecolor = '#ffffff'  # アクティブ＆通常
+            else:
+                timecolor = '#4488ff'      # 非アクティブ
+
+            forms += f'''
 <form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="{IDNO}">
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
@@ -325,16 +328,7 @@ async def web_server():
 <span style="color:{timecolor}">{WKDN} {timestr_html}</span>　{NAME}
 </form>
 '''
-            else:
-                # 非アクティブ: 全項目青
-                forms += f'''
-<form action="/edit" method="post" class="form-row">
-<input type="hidden" name="id" value="{IDNO}">
-<button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
-<button type="submit" name="action" value="test">{USER.DESC_BUTTON_EXECTEST}</button>
-<span style="color:#4488ff">{WKDN} {timestr_html}　{NAME}</span>
-</form>
-'''
+
 
 
         if len(DataBase)==0:
