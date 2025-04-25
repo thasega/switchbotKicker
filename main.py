@@ -788,6 +788,19 @@ async def mDNSresponder():
             #print(f'mDNS response sent: {response_packet.hex()}')
 
 
+def AdjustTimeFirst():
+    max_retry = 20
+    for attempt in range(1, max_retry+1):
+        if AdjustTime()!=0:
+            return
+        log(f'Retry NTP sync... ({attempt}/{max_retry})')
+        utime.sleep(2)
+    log('NTP sync failed after 20 retries. Machine will reset!')
+    utime.sleep(2)
+    machine.reset()
+    return
+
+
 def AppInit():
     ledon()
     loginit()
@@ -795,10 +808,7 @@ def AppInit():
     DispBootReason()
     DispMACAddress()
     ConnectNetwork()
-    while AdjustTime()==0:
-        log('Retry')
-        utime.sleep(2)
-
+    AdjustTimeFirst()
     print(f'NOW(Offseted): {DatetimeString(OffsetUTCtime())}')
     gc.collect()
     ledoff()
