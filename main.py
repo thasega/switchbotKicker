@@ -209,7 +209,7 @@ async def ExecuteScene(SCENE_ID):
         log(f'SceneID is empty.')
         return
 
-    log(f'Execute scene {SCENE_ID}')
+    log(f'Scene {SCENE_ID} is executing.')
     url = f'https://api.switch-bot.com/v1.0/scenes/{SCENE_ID}/execute'
     ledon()
     gc.collect()
