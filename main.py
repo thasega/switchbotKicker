@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.38
+#  SwitchBot Kicker v1.39
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -217,7 +217,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.38'
+    HEADLINE = 'SwitchBot Kicker v1.39'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
