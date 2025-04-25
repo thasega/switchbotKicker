@@ -79,18 +79,27 @@ def DispMACAddress():
 
 def ConnectNetwork():
     wlan = network.WLAN(network.STA_IF)
-    wlan.active(False)
-    utime.sleep(1)
-    wlan.active(True)
-    network.hostname(USER.HOSTNAME)
-    wlan.connect(USER.NET_SSID, USER.NET_PASS)
-
-    log('Connecting...')
-    while not wlan.isconnected():
+    retry_max = 10
+    for attempt in range(retry_max):
+        wlan.active(False)
         utime.sleep(1)
-        print('Connecting...')
-
-    log(f'WiFi Connected. IP address: {wlan.ifconfig()[0]}')
+        wlan.active(True)
+        try:
+            network.hostname(USER.HOSTNAME)
+        except Exception as e:
+            log(f'hostname setting failure: {e}')
+        wlan.connect(USER.NET_SSID, USER.NET_PASS)
+        log(f'Trying WiFi connection {attempt+1}/{retry_max}...')
+        for t in range(10):
+            if wlan.isconnected():
+                log(f'WiFi Connected. IP address: {wlan.ifconfig()[0]}')
+                return
+            utime.sleep(1)
+            print(f'Connecting... ({t+1}/10)')
+        log('WiFi connection failed, retry.')
+    log('WiFi connection failed, reset!')
+    utime.sleep(2)
+    machine.reset()
 
 
 def ResetRTC():
