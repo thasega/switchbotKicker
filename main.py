@@ -112,20 +112,27 @@ def TimeFromNTP():
     NTP_DELTA = 2208988800
     NTP_QUERY = bytearray(48)
     NTP_QUERY[0] = 0x1B
-    addr = socket.getaddrinfo(USER.NTP_HOST, 123)[0][-1]
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(1)
-    s.sendto(NTP_QUERY, addr)
-    try:
-        msg = s.recv(48)
-    except OSError:
-        log('No responce from NTP server.')
-        return 0
-    finally:
-        s.close()
-
-    val = struct.unpack('!I', msg[40:44])[0]
-    return val - NTP_DELTA
+    max_retry = 5
+    for attempt in range(1, max_retry+1):
+        try:
+            addr = socket.getaddrinfo(USER.NTP_HOST, 123)[0][-1]
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(2)
+            s.sendto(NTP_QUERY, addr)
+            msg = s.recv(48)
+            s.close()
+            val = struct.unpack('!I', msg[40:44])[0]
+            log(f'NTP fetch succeeded! (attempt {attempt})')
+            return val - NTP_DELTA
+        except OSError as e:
+            log(f'No response from NTP server... (attempt {attempt}/{max_retry})')
+            try:
+                s.close()
+            except:
+                pass
+            utime.sleep(1)
+    log('All NTP fetch retries failed...')
+    return 0
 
 def AdjustTime():
     ntp_time = TimeFromNTP()
