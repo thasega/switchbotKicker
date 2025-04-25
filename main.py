@@ -666,7 +666,7 @@ def getSuntimes(hour, minute):
 wdt = None
 def WDTstart():
     global wdt
-    #wdt = machine.WDT(timeout=8000)
+    wdt = machine.WDT(timeout=8000)
     
 def WDTfeed():
     global wdt
