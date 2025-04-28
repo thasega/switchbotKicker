@@ -280,15 +280,16 @@ async def web_server():
     # Log display / select edit schedule
     @app.route('/')
     async def _index(request):
-        gc.collect()
-        LOGS=''
-        for s in logqueue:
-            LOGS += f' {s}\n'
+        try:
+            gc.collect()
+            LOGS=''
+            for s in logqueue:
+                LOGS += f' {s}\n'
 
-        gc.collect()
-        sunrise_str = sunparam.convert_dayminute_to_timestring(sun_times['sunrise'])
-        sunset_str = sunparam.convert_dayminute_to_timestring(sun_times['sunset'])
-        forms = f'''
+            gc.collect()
+            sunrise_str = sunparam.convert_dayminute_to_timestring(sun_times['sunrise'])
+            sunset_str = sunparam.convert_dayminute_to_timestring(sun_times['sunset'])
+            forms = f'''
 <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <meta http-equiv="refresh" content="60">
 <title>{TITLE}</title><style> body {{color: #ffffff; background-color: #000000;}}
@@ -299,46 +300,40 @@ async def web_server():
 <pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre>
 <pre>{LOGS}</pre><hr><div class="form-container">
 '''
-        for i in range(len(DataBase)):
-            gc.collect()
-            # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
-            n = DataBase[i]
-            IDNO=i
-            NAME,WKDY,HOUR,MINU,SECO,ACTV = n[0],n[1],n[2],n[3],n[4],n[9]
-            checked = ' checked' if ACTV else ''
-
-            if HOUR == -2 or HOUR == -3:
-                tsec = getSuntimes(HOUR, MINU)
-                if tsec is not None:
-                    tstr = sunparam.convert_dayminute_to_timestring(tsec/60)
-                    timestr_html = f'{tstr}'
-                else:
-                    timestr_html = '--:--:--'
-            else:
-                HD = f'{HOUR:02d}' if HOUR>=0 else '**'
-                MD = f'{MINU:02d}' if MINU>=0 else '**'
-                timestr_html = f'{HD}:{MD}:{SECO:02d}'
-
-            WKDN=''
-            for D in WDPAT:
-                if D[0]==WKDY:
-                    WKDN=D[1]
-                    break
-
-            if n[9]:
+            for i in range(len(DataBase)):
+                gc.collect()
+                n = DataBase[i]
+                IDNO=i
+                NAME,WKDY,HOUR,MINU,SECO,ACTV = n[0],n[1],n[2],n[3],n[4],n[9]
+                checked = ' checked' if ACTV else ''
                 if HOUR == -2 or HOUR == -3:
-                    namecolor = '#ffffff'
-                    timecolor = '#ff4444'  
+                    tsec = getSuntimes(HOUR, MINU)
+                    if tsec is not None:
+                        tstr = sunparam.convert_dayminute_to_timestring(tsec/60)
+                        timestr_html = f'{tstr}'
+                    else:
+                        timestr_html = '--:--:--'
                 else:
-                    namecolor = '#ffffff'
-                    timecolor = '#ffffff'
-            else:
-                namecolor = '#666666'
-                timecolor = '#666666'
-
-            name_html = f'<span style="color:{namecolor}">{NAME}</span>'
-
-            forms += f'''
+                    HD = f'{HOUR:02d}' if HOUR>=0 else '**'
+                    MD = f'{MINU:02d}' if MINU>=0 else '**'
+                    timestr_html = f'{HD}:{MD}:{SECO:02d}'
+                WKDN=''
+                for D in WDPAT:
+                    if D[0]==WKDY:
+                        WKDN=D[1]
+                        break
+                if n[9]:
+                    if HOUR == -2 or HOUR == -3:
+                        namecolor = '#ffffff'
+                        timecolor = '#ff4444'  
+                    else:
+                        namecolor = '#ffffff'
+                        timecolor = '#ffffff'
+                else:
+                    namecolor = '#666666'
+                    timecolor = '#666666'
+                name_html = f'<span style="color:{namecolor}">{NAME}</span>'
+                forms += f'''
 <form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="{IDNO}">
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
@@ -346,12 +341,10 @@ async def web_server():
 <span style="color:{timecolor}">{WKDN} {timestr_html}</span> {name_html}
 </form>
 '''
-
-        if len(DataBase)==0:
-            forms += f'<label>{USER.DESC_TEXT_NOSCHEDULE}</label>'
-
-        DISABLE = ' disabled' if '(_initial_)' in SCENEDIC.keys() or len(SCENEDIC) == 0 else ''
-        forms += f'''
+            if len(DataBase)==0:
+                forms += f'<label>{USER.DESC_TEXT_NOSCHEDULE}</label>'
+            DISABLE = ' disabled' if '(_initial_)' in SCENEDIC.keys() or len(SCENEDIC) == 0 else ''
+            forms += f'''
 </div><hr><form action="/edit" method="post" class="form-row">
 <input type="hidden" name="id" value="-1">
 <button type="submit" name="action" value="change"{DISABLE}>{USER.DESC_BUTTON_ADDSCHEDULE}</button>
@@ -360,8 +353,11 @@ async def web_server():
 <button type="submit" name="action" value="delete"{DISABLE}>{USER.DESC_BUTTON_SCENEDELETE}</button>
 </form></body></html>
 '''
-        gc.collect()
-        return forms, 200, html_headers
+            gc.collect()
+            return forms, 200, html_headers
+        except MemoryError:
+            gc.collect()
+            return f'<h1>Internal Server Error</h1><p>{USER.DESC_ERROR_MEMORY}</p>', 500, html_headers
 
 
     # Edit schedule (and interface with worker)
@@ -392,8 +388,9 @@ async def web_server():
         if action == 'delete':
             return html_transdelete, 200, html_headers
 
-        gc.collect()
-        forms = f'''
+        try:
+            gc.collect()
+            forms = f'''
 <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>{TITLE}</title>
 <style> body {{color: #ffffff; background-color: #000000;}}
@@ -404,133 +401,131 @@ async def web_server():
 <p>{USER.DESC_TEXT_SCHEDULESETTING}</p>
 <div class="form-container">
 '''
-        i = int(request.form.get('id',-1))
-        n = DataBase[i] if i>=0 else ('(noname)',(0,1,2,3,4,5,6),12,0,0,0,0,0,next(iter(SCENEDIC)),True)
-        itsnew = i==-1
-        IDNO=i
-        # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
-        NAME,WKDY,HOUR,MINU,SECO,SNAM,ACTV = n[0],n[1],n[2],n[3],n[4],n[8],n[9]
-        ACTV=' checked' if n[9]==True else ''
-        gc.collect()
-
-        forms += f'''
+            i = int(request.form.get('id',-1))
+            n = DataBase[i] if i>=0 else ('(noname)',(0,1,2,3,4,5,6),12,0,0,0,0,0,next(iter(SCENEDIC)),True)
+            itsnew = i==-1
+            IDNO=i
+            NAME,WKDY,HOUR,MINU,SECO,SNAM,ACTV = n[0],n[1],n[2],n[3],n[4],n[8],n[9]
+            ACTV=' checked' if n[9]==True else ''
+            gc.collect()
+            forms += f'''
 <form action="/apply" method="post" class="form-row">
 <input type="hidden" name="id" value="{IDNO}">
 <input type="checkbox" name="active" value="1"{ACTV}>
 <input type="text" name="name" value="{NAME}">
 '''
-        temp = '<select name="weekday">'
-        for j in range(len(WDPAT)):
-            sel = ' selected' if WDPAT[j][0]==WKDY else ''
-            temp += f'<option value="{WDPAT[j][0]}"{sel}>{WDPAT[j][1]}</option>'
-        temp += '</select>'
-        forms += temp
-
-        temp = '<select name="hour">'
-        for j in range(-1,24):
-            cap = f'{j}' if j>=0 else '**'
-            sel = ' selected' if j==HOUR else ''
-            temp += f'<option value="{j}"{sel}>{cap}</option>'
-        sel_sunrise = ' selected' if HOUR==-2 else ''
-        sel_sunset = ' selected' if HOUR==-3 else ''
-        temp += f'<option value="-2"{sel_sunrise}>{USER.DESC_TEXT_SUNRISE}</option>'
-        temp += f'<option value="-3"{sel_sunset}>{USER.DESC_TEXT_SUNSET}</option>'
-        temp += '</select>'
-        forms += temp
-
-        temp = '<select name="minute">'
-        for j in range(-1,60):
-            cap = f'{j:02d}' if j>=0 else '**'
-            sel = ' selected' if j==MINU else ''
-            temp += f'<option value="{j}"{sel}>{cap}</option>'
-        temp += '</select>'
-        forms += temp
-
-        temp = '<select name="second">'
-        for j in range(60):
-            sel = ' selected' if j==SECO else ''
-            temp += f'<option value="{j}"{sel}>{j:02d}</option>'
-        temp += '</select>'
-        forms += temp
-
-        temp = '<select name="scenename">'
-        for s in SCENEDIC.keys():
-            sel = ' selected' if s==SNAM else ''
-            temp += f'<option value="{s}"{sel}>{s}</option>'
-        temp += '</select>'
-        forms += temp
-
-        del temp
-        temp = None
-        gc.collect()
-        
-        if itsnew:
-            forms += f'''
+            temp = '<select name="weekday">'
+            for j in range(len(WDPAT)):
+                sel = ' selected' if WDPAT[j][0]==WKDY else ''
+                temp += f'<option value="{WDPAT[j][0]}"{sel}>{WDPAT[j][1]}</option>'
+            temp += '</select>'
+            forms += temp
+            temp = '<select name="hour">'
+            for j in range(-1,24):
+                cap = f'{j}' if j>=0 else '**'
+                sel = ' selected' if j==HOUR else ''
+                temp += f'<option value="{j}"{sel}>{cap}</option>'
+            sel_sunrise = ' selected' if HOUR==-2 else ''
+            sel_sunset = ' selected' if HOUR==-3 else ''
+            temp += f'<option value="-2"{sel_sunrise}>{USER.DESC_TEXT_SUNRISE}</option>'
+            temp += f'<option value="-3"{sel_sunset}>{USER.DESC_TEXT_SUNSET}</option>'
+            temp += '</select>'
+            forms += temp
+            temp = '<select name="minute">'
+            for j in range(-1,60):
+                cap = f'{j:02d}' if j>=0 else '**'
+                sel = ' selected' if j==MINU else ''
+                temp += f'<option value="{j}"{sel}>{cap}</option>'
+            temp += '</select>'
+            forms += temp
+            temp = '<select name="second">'
+            for j in range(60):
+                sel = ' selected' if j==SECO else ''
+                temp += f'<option value="{j}"{sel}>{j:02d}</option>'
+            temp += '</select>'
+            forms += temp
+            temp = '<select name="scenename">'
+            for s in SCENEDIC.keys():
+                sel = ' selected' if s==SNAM else ''
+                temp += f'<option value="{s}"{sel}>{s}</option>'
+            temp += '</select>'
+            forms += temp
+            del temp
+            temp = None
+            gc.collect()
+            if itsnew:
+                forms += f'''
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_APPEND}</button>
 <button type="submit" name="action" value="cancel">{USER.DESC_BUTTON_APPENDCANCEL}</button>
 '''
-        else:
-            forms += f'''
+            else:
+                forms += f'''
 <button type="submit" name="action" value="change">{USER.DESC_BUTTON_CHANGE}</button>
 <button type="submit" name="action" value="cancel">{USER.DESC_BUTTON_CHANGECANCEL}</button>
 <button type="submit" name="action" value="delete">{USER.DESC_BUTTON_DELETE}</button>
 '''
-        forms += '</form></div></body></html>'
-
-        gc.collect()
-        return forms, 200, html_headers
+            forms += '</form></div></body></html>'
+            gc.collect()
+            return forms, 200, html_headers
+        except MemoryError:
+            gc.collect()
+            return f'<h1>Internal Server Error</h1><p>{USER.DESC_ERROR_MEMORY}</p>', 500, html_headers
 
     # Apply edited schedule
     @app.route('/apply', methods=['POST'])
     async def _apply(request):
-        action = request.form.get('action','cancel')
-        id = int(request.form.get('id',-100))
-
-        if action == 'cancel' or id==-100:
+        try:
+            gc.collect()
+            action = request.form.get('action','cancel')
+            id = int(request.form.get('id',-100))
+            if action == 'cancel' or id==-100:
+                return html_backhome, 200, html_headers
+            if action == 'delete':
+                if id >= 0:
+                    del DataBase[id]
+                    SaveDataBase()
+                gc.collect()
+                return html_backhome, 200, html_headers
+            if id == -1:
+                DataBase.append(('(empty)',(-1,),0,0,0,0,0,0,'',True))
+                id = len(DataBase)-1
+            L = list(DataBase[id])
+            L[0] = request.form.get('name','(noname)')
+            L[1] = eval(request.form.get('weekday','(0,1,2,3,4,5,6)'))
+            L[2] = int(request.form.get('hour',12))
+            L[3] = int(request.form.get('minute',0))
+            L[4] = int(request.form.get('second',0))
+            L[8] = request.form.get('scenename','')
+            L[9] = request.form.get('active','0')=='1'
+            DataBase[id] = tuple(L)
+            print(f'Update DataBase: {id} {DataBase[id]}')
+            del L
+            gc.collect()
+            SaveDataBase()
+            gc.collect()
             return html_backhome, 200, html_headers
-
-        if action == 'delete':
-            if id >= 0:
-                del DataBase[id]
-                SaveDataBase()
-            return html_backhome, 200, html_headers
-
-        # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
-        if id == -1:
-            DataBase.append(('(empty)',(-1,),0,0,0,0,0,0,'',True))
-            id = len(DataBase)-1
-
-        L = list(DataBase[id])
-        L[0] = request.form.get('name','(noname)')
-        L[1] = eval(request.form.get('weekday','(0,1,2,3,4,5,6)'))
-        L[2] = int(request.form.get('hour',12))
-        L[3] = int(request.form.get('minute',0))
-        L[4] = int(request.form.get('second',0))
-        L[8] = request.form.get('scenename','')
-        L[9] = request.form.get('active','0')=='1'
-        DataBase[id] = tuple(L)
-        print(f'Update DataBase: {id} {DataBase[id]}')
-        SaveDataBase()
-        gc.collect()
-        return html_backhome, 200, html_headers
+        except MemoryError:
+            gc.collect()
+            return f'<h1>Internal Server Error</h1><p>{USER.DESC_ERROR_MEMORY}</p>', 500, html_headers
 
 
     # Select Switchbot scenes to regist
     @app.route('/regist')
     async def _regist(request):
-        global parsed_scenes
-        if parsed_scenes==None:
-            jsontext = await RetrieveScenes()
-            if jsontext=='':
-                log('Retrieve scenes failed.')
-                return html_backhome, 200, html_headers
-            parsed_json = ujson.loads(jsontext)
-            parsed_scenes = {}
-            for S in parsed_json['body']:
-                parsed_scenes[S['sceneName']] = S['sceneId']
-            del parsed_json
-
-        forms = f'''
+        try:
+            gc.collect()
+            if parsed_scenes==None:
+                jsontext = await RetrieveScenes()
+                if jsontext=='':
+                    log('Retrieve scenes failed.')
+                    return html_backhome, 200, html_headers
+                parsed_json = ujson.loads(jsontext)
+                parsed_scenes = {}
+                for S in parsed_json['body']:
+                    parsed_scenes[S['sceneName']] = S['sceneId']
+                del parsed_json
+                gc.collect()
+            forms = f'''
 <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>{TITLE}</title>
 <style> body {{color: #ffffff; background-color: #000000;}}
@@ -541,50 +536,59 @@ async def web_server():
 <p>{USER.DESC_TEXT_REGISTSCENES}</p>
 <form action="/regapply" method="post">
 '''
-        idx = 0
-        for S in parsed_scenes.keys():
-            gc.collect()
-            sceneId = parsed_scenes[S]
-            if not sceneId in SCENEDIC.values():
-                forms += f'''
+            idx = 0
+            for S in parsed_scenes.keys():
+                gc.collect()
+                sceneId = parsed_scenes[S]
+                if not sceneId in SCENEDIC.values():
+                    forms += f'''
 <div>
 <input type="checkbox" name="active" value="{idx}">
 <input type="text" name="caption" value="{S}">
 <input type="hidden" name="sID" value="{sceneId}">
 </div>
 '''
-                idx += 1
-                gc.collect
-
-        forms += f'''
+                    idx += 1
+                    gc.collect()
+            forms += f'''
 <hr><div>
 <button type="submit">{USER.DESC_BUTTON_REGIST}</button>
 <button type="submit" name="action" value="cancel">{USER.DESC_BUTTON_REGISTCANCEL}</button>
 </div></form></body></html>
 '''
-        gc.collect()
-        return forms, 200, html_headers
+            gc.collect()
+            return forms, 200, html_headers
+        except MemoryError:
+            gc.collect()
+            return f'<h1>Internal Server Error</h1><p>{USER.DESC_ERROR_MEMORY}</p>', 500, html_headers
         
     # Regist selected Switchbot scenes
     @app.route('/regapply', methods=['POST'])
     async def _regapply(request):
-        global parsed_scenes
-        if request.form.get('action')!='cancel':
-            actives  = request.form.getlist('active')
-            captions = request.form.getlist('caption')
-            sIDs = request.form.getlist('sID')
-            if '(_initial_)' in SCENEDIC.keys():
-                SCENEDIC.clear()
-            for ID in actives:
-                id = int(ID)
-                SCENEDIC[captions[id]] = sIDs[id]
-                print(f'SCENEDIC add:("{captions[id]}":"{sIDs[id]}")')
-            SaveSceneDic()
-
-        del parsed_scenes
-        parsed_scenes = None
-        gc.collect()
-        return html_backhome, 200, html_headers
+        try:
+            gc.collect()
+            if request.form.get('action')!='cancel':
+                actives  = request.form.getlist('active')
+                captions = request.form.getlist('caption')
+                sIDs = request.form.getlist('sID')
+                if '(_initial_)' in SCENEDIC.keys():
+                    SCENEDIC.clear()
+                for ID in actives:
+                    id = int(ID)
+                    SCENEDIC[captions[id]] = sIDs[id]
+                    print(f'SCENEDIC add:("{captions[id]}":"{sIDs[id]}")')
+                del actives
+                del captions
+                del sIDs
+                gc.collect()
+                SaveSceneDic()
+            del parsed_scenes
+            parsed_scenes = None
+            gc.collect()
+            return html_backhome, 200, html_headers
+        except MemoryError:
+            gc.collect()
+            return f'<h1>Internal Server Error</h1><p>{USER.DESC_ERROR_MEMORY}</p>', 500, html_headers
 
     # Delete registered Switchbot scenes
     @app.route('/delete')
