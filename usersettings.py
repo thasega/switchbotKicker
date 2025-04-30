@@ -53,3 +53,5 @@ DESC_BUTTON_TIMEADJUST  = '時刻校正'
 DESC_BUTTON_SCENEREGIST = '使用シーン登録'
 DESC_BUTTON_SCENEDELETE = '使用シーン削除'
 
+DESC_ERROR_MEMORY = 'メモリ不足です。再起動やシーン・スケジュール数削減を検討してください。'
+
