@@ -512,6 +512,7 @@ async def web_server():
     # Select Switchbot scenes to regist
     @app.route('/regist')
     async def _regist(request):
+        global parsed_scenes
         try:
             gc.collect()
             if parsed_scenes==None:
@@ -537,7 +538,7 @@ async def web_server():
 <form action="/regapply" method="post">
 '''
             idx = 0
-            for S in parsed_scenes.keys():
+            for S in sorted(parsed_scenes):
                 gc.collect()
                 sceneId = parsed_scenes[S]
                 if not sceneId in SCENEDIC.values():
@@ -565,6 +566,7 @@ async def web_server():
     # Regist selected Switchbot scenes
     @app.route('/regapply', methods=['POST'])
     async def _regapply(request):
+        global parsed_scenes
         try:
             gc.collect()
             if request.form.get('action')!='cancel':
