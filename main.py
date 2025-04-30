@@ -241,7 +241,6 @@ async def web_server():
         ((0,1,2,3),USER.DESC_TEXT_MON2THU),
         ((0,2,4),USER.DESC_TEXT_MONWEFRI),
         ((1,3,5),USER.DESC_TEXT_TUETHSAT),
-        ((1,4),USER.DESC_TEXT_TUEFRI),
         ((0,),USER.DESC_TEXT_MONDAY),
         ((1,),USER.DESC_TEXT_TUESDAY),
         ((2,),USER.DESC_TEXT_WEDNESDAY),
@@ -251,6 +250,8 @@ async def web_server():
         ((6,),USER.DESC_TEXT_SUNDAY),
         ((4,5,6),USER.DESC_TEXT_FRI2SUN),
         ((5,6),USER.DESC_TEXT_WEEKEND),
+        ((1,4),USER.DESC_TEXT_TUEFRI),
+        ((0,1,2,3,6),USER.DESC_TEXT_SUN2THU),
     )
 
     html_backhome = f'''
