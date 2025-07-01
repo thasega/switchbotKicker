@@ -16,7 +16,6 @@ LONGITUDE = 139.7414
 DESC_TEXT_SCHEDULESETTING = '実行する時刻とシーンを設定してください'
 DESC_TEXT_REGISTSCENES    = '登録するシーンを選択してください'
 DESC_TEXT_NOSCHEDULE      = '--- スケジュールが設定されていません ---'
-
 DESC_TEXT_SELECTDELSCENES = '登録削除するシーンを選択してください'
 
 DESC_TEXT_EVERYDAY = '毎　日'
@@ -33,6 +32,8 @@ DESC_TEXT_FRI2SUN  = '金土日'
 DESC_TEXT_WEEKEND  = '土・日'
 DESC_TEXT_MONWEFRI = '月水金'
 DESC_TEXT_TUETHSAT = '火木土'
+DESC_TEXT_TUEFRI   = '火・金'
+DESC_TEXT_SUN2THU  = '日～木'
 
 DESC_TEXT_SUNRISE  = '日の出'
 DESC_TEXT_SUNSET   = '日の入'
@@ -52,6 +53,7 @@ DESC_BUTTON_EXECTEST    = 'テスト'
 DESC_BUTTON_TIMEADJUST  = '時刻校正'
 DESC_BUTTON_SCENEREGIST = '使用シーン登録'
 DESC_BUTTON_SCENEDELETE = '使用シーン削除'
+DESC_BUTTON_REBOOT = '再起動'
 
 DESC_ERROR_MEMORY = 'メモリ不足です。再起動やシーン・スケジュール数削減を検討してください。'
 

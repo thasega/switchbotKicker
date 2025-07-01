@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.39
+#  SwitchBot Kicker v1.40
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -233,7 +233,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.39'
+    HEADLINE = 'SwitchBot Kicker v1.40'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -250,6 +250,8 @@ async def web_server():
         ((6,),USER.DESC_TEXT_SUNDAY),
         ((4,5,6),USER.DESC_TEXT_FRI2SUN),
         ((5,6),USER.DESC_TEXT_WEEKEND),
+        ((1,4),USER.DESC_TEXT_TUEFRI),
+        ((0,1,2,3,6),USER.DESC_TEXT_SUN2THU),
     )
 
     html_backhome = f'''
@@ -351,6 +353,7 @@ async def web_server():
 <button type="submit" name="action" value="adjust">{USER.DESC_BUTTON_TIMEADJUST}</button>
 <button type="submit" name="action" value="regist">{USER.DESC_BUTTON_SCENEREGIST}</button>
 <button type="submit" name="action" value="delete"{DISABLE}>{USER.DESC_BUTTON_SCENEDELETE}</button>
+<button type="submit" name="action" value="reboot">{USER.DESC_BUTTON_REBOOT}</button>
 </form></body></html>
 '''
             gc.collect()
@@ -366,6 +369,7 @@ async def web_server():
         global testtime
         global testscene
         global adjusttime
+        global bWDT
 
         gc.collect()
         action = request.form.get('action')
@@ -387,6 +391,11 @@ async def web_server():
 
         if action == 'delete':
             return html_transdelete, 200, html_headers
+            
+        if action == 'reboot':
+            bWDT = False
+            log('Reboot scheduled.')
+            return html_backhome, 200, html_headers
 
         try:
             gc.collect()
@@ -686,14 +695,19 @@ def getSuntimes(hour, minute):
     
 
 wdt = None
+bWDT = True
 def WDTstart():
     global wdt
+    global bWDT
     wdt = machine.WDT(timeout=8000)
+    bWDT = True
     
 def WDTfeed():
     global wdt
+    global bWDT
     if wdt!=None:
-        wdt.feed()
+        if bWDT:
+            wdt.feed()
 
 async def worker():
     global testtime
