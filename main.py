@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.39
+#  SwitchBot Kicker v1.40
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -233,7 +233,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.39'
+    HEADLINE = 'SwitchBot Kicker v1.40'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -353,6 +353,7 @@ async def web_server():
 <button type="submit" name="action" value="adjust">{USER.DESC_BUTTON_TIMEADJUST}</button>
 <button type="submit" name="action" value="regist">{USER.DESC_BUTTON_SCENEREGIST}</button>
 <button type="submit" name="action" value="delete"{DISABLE}>{USER.DESC_BUTTON_SCENEDELETE}</button>
+<button type="submit" name="action" value="reboot">{USER.DESC_BUTTON_REBOOT}</button>
 </form></body></html>
 '''
             gc.collect()
@@ -389,6 +390,11 @@ async def web_server():
 
         if action == 'delete':
             return html_transdelete, 200, html_headers
+            
+        if action == 'reboot':
+            log('System reboot...')
+            import machine
+            machine.reset()
 
         try:
             gc.collect()
