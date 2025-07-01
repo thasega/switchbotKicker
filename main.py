@@ -369,6 +369,7 @@ async def web_server():
         global testtime
         global testscene
         global adjusttime
+        global bWDT
 
         gc.collect()
         action = request.form.get('action')
@@ -392,9 +393,9 @@ async def web_server():
             return html_transdelete, 200, html_headers
             
         if action == 'reboot':
-            log('System reboot...')
-            import machine
-            machine.reset()
+            bWDT = False
+            log('Reboot scheduled.')
+            return html_backhome, 200, html_headers
 
         try:
             gc.collect()
@@ -694,14 +695,19 @@ def getSuntimes(hour, minute):
     
 
 wdt = None
+bWDT = True
 def WDTstart():
     global wdt
+    global bWDT
     wdt = machine.WDT(timeout=8000)
+    bWDT = True
     
 def WDTfeed():
     global wdt
+    global bWDT
     if wdt!=None:
-        wdt.feed()
+        if bWDT:
+            wdt.feed()
 
 async def worker():
     global testtime
