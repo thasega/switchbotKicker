@@ -1,5 +1,5 @@
 #
-#  SwitchBot Kicker v1.40
+#  SwitchBot Kicker v1.41exp
 #       written by Tsuyoshi HASEGAWA 2025
 #
 import network
@@ -13,8 +13,10 @@ import aiohttp
 import ujson
 import select
 from collections import OrderedDict
+# from collections import deque
 from microdot import Microdot
 from machine import Pin
+from machine import ADC
 
 import usersettings as USER
 import sunparam
@@ -154,6 +156,29 @@ def DispBootReason():
         log('Reboot cause unknown reason.')
 
 
+TEMP_SENSOR_CHANNEL = 4
+adc = ADC(TEMP_SENSOR_CHANNEL)
+
+# Why deque doesn't work?
+temps = [20.0]*10
+tempsidx = 0
+
+def MeasureTemperature():
+    global adc
+    global temps
+    global tempsidx
+    adc_value = adc.read_u16()
+    conversion_factor = 3.3 / (65535)
+    voltage = adc_value * conversion_factor
+    temperature_celsius = (27 - (voltage - 0.706) / 0.001721) - 10
+    temps[tempsidx] = temperature_celsius
+    tempsidx = (tempsidx+1) % 10
+
+def GetTemperature():
+    global temps
+    return sum(temps)/len(temps)
+
+
 # (NAME,WEEKDAYS,HOUR,MINUTE,SECOND,YEAR,MONTH,DAY,SCENENAME,ACTIVE)
 DataBase=[]
 CnfFileName='SwBotKicker.cnf'
@@ -225,6 +250,7 @@ async def ExecuteScene(SCENE_ID):
 # Interface variables between web server and worker
 testtime = 0
 testscene = ''
+testscenename = ''
 adjusttime = 0
 
 # Share variable between web pages
@@ -233,7 +259,7 @@ parsed_scenes = None
 async def web_server():
 
     TITLE = 'SwitchBot Kicker'
-    HEADLINE = 'SwitchBot Kicker v1.40'
+    HEADLINE = 'SwitchBot Kicker v1.41exp'
 
     WDPAT = (
         ((0,1,2,3,4,5,6),USER.DESC_TEXT_EVERYDAY),
@@ -291,6 +317,7 @@ async def web_server():
             gc.collect()
             sunrise_str = sunparam.convert_dayminute_to_timestring(sun_times['sunrise'])
             sunset_str = sunparam.convert_dayminute_to_timestring(sun_times['sunset'])
+            temperature = GetTemperature()
             forms = f'''
 <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <meta http-equiv="refresh" content="60">
@@ -299,6 +326,7 @@ async def web_server():
 .form-row {{ display: flex; align-items: center; gap: 8px; }}
 </style></head><body><h1>{HEADLINE}</h1>
 <pre>Today's Sunrise/Sunset: {sunrise_str} / {sunset_str}</pre>
+<pre>Temperature: {temperature}℃</pre>
 <pre>Log updated: {DatetimeString(OffsetUTCtime())}</pre>
 <pre>{LOGS}</pre><hr><div class="form-container">
 '''
@@ -368,6 +396,7 @@ async def web_server():
     async def _edit(request):
         global testtime
         global testscene
+        global testscenename
         global adjusttime
         global bWDT
 
@@ -375,10 +404,12 @@ async def web_server():
         action = request.form.get('action')
         if action =='test':
             i = int(request.form.get('id',-1))
+            # log(DataBase[i])
             scenename = DataBase[i][8]
-            testscene = SCENEDIC[scenename]
+            testscene = scenename
+            testscenename = DataBase[i][0]
             testtime = OffsetUTCtime()+1
-            log(f'Kick test scheduled: {testscene}')
+            log(f'Kick test scheduled: {testscenename}')
             return html_backhome, 200, html_headers
 
         if action == 'adjust':
@@ -664,16 +695,30 @@ async def checkScheduleAndKick(dtime):
             if target_sec != None:
                 if abs(now_sec - target_sec) < 1:
                     scenename = S[8]
-                    await kickScene(scenename)
+                    await kickScene(S[0], scenename)
             else:
                 if hour < 0 or dtime[3] == hour:
                     if minute < 0 or dtime[4] == minute:
                         if dtime[5] == second:
                             scenename = S[8]
-                            await kickScene(scenename)
+                            await kickScene(S[0], scenename)
 
 
-async def kickScene(scenename):
+async def kickScene(name, scenename):
+    if 'FHON' in name:
+        temp = GetTemperature()
+        log(f'Check temperature for ON: {temp}℃')
+        if temp >= USER.FH_TEMPERATURE:
+            log('Floor heater is probably switched on, Do nothing.')
+            return
+
+    if 'FHOFF' in name:
+        temp = GetTemperature()
+        log(f'Check temperature for OFF: {temp}℃')
+        if temp < USER.FH_TEMPERATURE:
+            log('Floor heater is probably switched off, Do nothing.')
+            return        
+
     if scenename in SCENEDIC:
         await ExecuteScene(SCENEDIC[scenename])
     else:
@@ -712,6 +757,7 @@ def WDTfeed():
 async def worker():
     global testtime
     global testscene
+    global testscenename
     global adjusttime
     global sun_times
 
@@ -738,12 +784,13 @@ async def worker():
 
             # Active Sense
             if rtime>=activetime:
+                MeasureTemperature()
                 logActive()
                 activetime = OffsetUTCtime()+10
 
             # Kick Test
             if rtime==testtime:
-                await ExecuteScene(testscene)
+                await kickScene(testscenename,testscene)
                 log('Kick test executed.')
 
             await checkScheduleAndKick(dtime)
